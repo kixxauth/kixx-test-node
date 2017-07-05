@@ -1,0 +1,26 @@
+{
+  "name": "kixx-test-node",
+  "version": "0.1.0",
+  "description": "A Node.js test runner and reporter with Kixx-Test under the hood.",
+  "main": "index.js",
+  "scripts": {
+    "test": "eslint ./ && node ./test.js",
+    "lint": "eslint ./"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kixxauth/kixx-test-node.git"
+  },
+  "keywords": [
+    "test",
+    "assertion",
+    "runner",
+    "testing"
+  ],
+  "author": "Kris Walker (www.kixx.name)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kixxauth/kixx-test-node/issues"
+  },
+  "homepage": "https://github.com/kixxauth/kixx-test-node#readme"
+}
