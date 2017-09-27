@@ -16,6 +16,10 @@ module.exports = {
 		"no-var": [
 			"error"
 		],
+		"one-var": [
+			"error",
+			"never"
+		],
 		"no-caller": [
 			"error"
 		],
@@ -82,7 +86,17 @@ module.exports = {
 		],
 		"quotes": [
 			"error",
-			"single"
+			"backtick"
+		],
+		"no-mixed-requires": [
+			"error",
+			{"grouping": true, "allowCall": true}
+		],
+		"no-process-env": [
+			"error"
+		],
+		"no-console": [
+			"error"
 		],
 		"no-warning-comments": [
 			"warn",

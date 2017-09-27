@@ -1,9 +1,9 @@
 'use strict';
 
-const OS = require('os');
-const Yargs = require('yargs');
-const Filepath = require('filepath');
-const KixxTest = require('kixx-test');
+const OS = require(`os`);
+const Yargs = require(`yargs`);
+const Filepath = require(`filepath`);
+const KixxTest = require(`kixx-test`);
 
 const DEFAULT_TIMEOUT = 5000;
 const DEFAULT_MAX_ERRORS = Infinity;
@@ -11,27 +11,27 @@ const DEFAULT_MAX_STACK = 5;
 const EOL = OS.EOL;
 
 const ARGV = Yargs
-	.option('directory', {
-		alias: 'd',
-		describe: 'The name of your test directory.',
-		default: 'test',
-		type: 'string'
+	.option(`directory`, {
+		alias: `d`,
+		describe: `The name of your test directory.`,
+		default: `test`,
+		type: `string`
 	})
-	.option('timeout', {
-		alias: 't',
-		describe: 'The time limit for each .before(), .after(), and .it() block.',
+	.option(`timeout`, {
+		alias: `t`,
+		describe: `The time limit for each .before(), .after(), and .it() block.`,
 		default: DEFAULT_TIMEOUT,
-		type: 'number'
+		type: `number`
 	})
-	.option('maxErrors', {
-		describe: 'The maximum errors allowed before exiting. "-1" will result in Infinity.',
+	.option(`maxErrors`, {
+		describe: `The maximum errors allowed before exiting. "-1" will result in Infinity.`,
 		default: DEFAULT_MAX_ERRORS,
-		type: 'number'
+		type: `number`
 	})
-	.option('maxStack', {
-		describe: 'The maximum number of lines you want in your stack traces.',
+	.option(`maxStack`, {
+		describe: `The maximum number of lines you want in your stack traces.`,
 		default: DEFAULT_MAX_STACK,
-		type: 'number'
+		type: `number`
 	}).argv;
 
 const hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -41,17 +41,17 @@ function get(key, obj) {
 }
 
 function isNumber(n) {
-	return typeof n === 'number' && !isNaN(n);
+	return typeof n === `number` && !isNaN(n);
 }
 
 function isFunction(fn) {
-	return typeof fn === 'function';
+	return typeof fn === `function`;
 }
 
 function main(args) {
-	const timeout = isNumber(get('timeout', args)) ? get('timeout', args) : DEFAULT_TIMEOUT;
-	const maxErrors = isNumber(get('maxErrors', args)) ? get('maxErrors', args) : DEFAULT_MAX_ERRORS;
-	const maxStack = isNumber(get('maxStack', args)) ? get('maxStack', args) : DEFAULT_MAX_STACK;
+	const timeout = isNumber(get(`timeout`, args)) ? get(`timeout`, args) : DEFAULT_TIMEOUT;
+	const maxErrors = isNumber(get(`maxErrors`, args)) ? get(`maxErrors`, args) : DEFAULT_MAX_ERRORS;
+	const maxStack = isNumber(get(`maxStack`, args)) ? get(`maxStack`, args) : DEFAULT_MAX_STACK;
 
 	const runner = KixxTest.createRunner({timeout});
 
@@ -91,7 +91,7 @@ function main(args) {
 		process.exit(code);
 	}
 
-	runner.on('error', (err) => {
+	runner.on(`error`, (err) => {
 		errorsToReport.push(err);
 
 		totalErrorCount += 1;

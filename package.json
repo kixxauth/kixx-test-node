@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "filepath": "1.1.0",
-    "yargs": "8.0.2"
+    "kixx-test": "1.0.1",
+    "yargs": "9.0.1"
   },
   "repository": {
     "type": "git",
