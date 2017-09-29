@@ -65,7 +65,7 @@ function main(args) {
 	let totalErrorCount = 0;
 
 	function setBlock(ev) {
-		currentBlockPath = ev.parents.join(' ');
+		currentBlockPath = ev.parents.join(` `);
 	}
 
 	function clearBlock() {
@@ -75,7 +75,7 @@ function main(args) {
 	}
 
 	function isBlockChange(ev) {
-		const path = ev.parents.join(' ');
+		const path = ev.parents.join(` `);
 		return path !== currentBlockPath;
 	}
 
@@ -106,39 +106,39 @@ function main(args) {
 		}
 	});
 
-	runner.on('blockStart', (ev) => {
+	runner.on(`blockStart`, (ev) => {
 		if (isBlockChange(ev)) {
 			setBlock(ev);
 			process.stderr.write(EOL + currentBlockPath);
 		}
 
 		switch (ev.type) {
-			case 'before':
+			case `before`:
 				beforeStartTime = Date.now();
 				inBeforeBlock = true;
 				break;
-			case 'after':
+			case `after`:
 				afterStartTime = Date.now();
 				break;
 		}
 	});
 
-	runner.on('blockComplete', (ev) => {
+	runner.on(`blockComplete`, (ev) => {
 		inBeforeBlock = false;
 
 		switch (ev.type) {
-			case 'before':
+			case `before`:
 				process.stderr.write(`${EOL}before() ${Date.now() - beforeStartTime}ms`);
 				beforeStartTime = null;
 				break;
-			case 'after':
+			case `after`:
 				process.stderr.write(`${EOL + currentBlockPath} : after() ${Date.now() - afterStartTime}ms`);
 				afterStartTime = null;
 				break;
 			default: // ev.type === "test" and all others.
 				testCount += 1;
 				if (blockTestCount === 0) process.stderr.write(EOL);
-				process.stderr.write('.');
+				process.stderr.write(`.`);
 		}
 
 		if (isBlockChange(ev)) {
@@ -147,7 +147,7 @@ function main(args) {
 		}
 	});
 
-	runner.on('end', () => {
+	runner.on(`end`, () => {
 		process.stderr.write(`${EOL}Test run complete. ${testCount} tests ran. ${totalErrorCount} errors reported.${EOL}`);
 		exit(0);
 	});
@@ -156,11 +156,11 @@ function main(args) {
 }
 
 function isConfigFile(file) {
-	return file.basename() === 'config.js';
+	return file.basename() === `config.js`;
 }
 
 function isSetupFile(file) {
-	return file.basename() === 'setup.js';
+	return file.basename() === `setup.js`;
 }
 
 function isTestFile(file) {
