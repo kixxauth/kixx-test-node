@@ -48,6 +48,27 @@ function isFunction(fn) {
 	return typeof fn === `function`;
 }
 
+class UserError extends Error {
+	constructor(message) {
+		super(message);
+
+		Object.defineProperties(this, {
+			name: {
+				enumerable: true,
+				value: `UserError`
+			},
+			message: {
+				enumerable: true,
+				value: message
+			},
+			code: {
+				enumerable: true,
+				value: `USER_ERROR`
+			}
+		});
+	}
+}
+
 function main(args) {
 	const timeout = isNumber(get(`timeout`, args)) ? get(`timeout`, args) : DEFAULT_TIMEOUT;
 	const maxErrors = isNumber(get(`maxErrors`, args)) ? get(`maxErrors`, args) : DEFAULT_MAX_ERRORS;
@@ -221,7 +242,7 @@ function runCommandLineInterface() {
 		if (isFunction(configurator)) {
 			configurator(t);
 		} else {
-			throw new Error(`The setup file at ${file.path} must export a single function.`);
+			throw new UserError(`The setup file at ${file.path} must export a single function.`);
 		}
 	});
 
@@ -230,7 +251,7 @@ function runCommandLineInterface() {
 		if (isFunction(configurator)) {
 			configurator(t);
 		} else {
-			throw new Error(`The test file at ${file.path} must export a single function.`);
+			throw new UserError(`The test file at ${file.path} must export a single function.`);
 		}
 	});
 
