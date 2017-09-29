@@ -76,32 +76,29 @@ function main(args) {
 
 	const runner = KixxTest.createRunner({timeout});
 
+	const allErrors = [];
 	let testCount = 0;
 	let currentBlockPath = null;
-	let blockTestCount = 0;
-	let errorsToReport = [];
+	let currentBlockErrors = [];
 	let beforeStartTime;
 	let afterStartTime;
-	let inBeforeBlock = false;
-	let totalErrorCount = 0;
 
 	function setBlock(ev) {
 		currentBlockPath = ev.parents.join(` `);
+		currentBlockErrors = [];
 	}
 
 	function clearBlock() {
 		currentBlockPath = null;
-		errorsToReport = [];
-		blockTestCount = 0;
+		currentBlockErrors = [];
 	}
 
 	function isBlockChange(ev) {
-		const path = ev.parents.join(` `);
-		return path !== currentBlockPath;
+		return ev.parents.join(` `) !== currentBlockPath;
 	}
 
-	function reportErrors() {
-		errorsToReport.forEach((err) => {
+	function reportErrors(errors) {
+		errors.forEach((err) => {
 			const stack = err.stack && err.stack.split(EOL).slice(0, maxStack).join(EOL).trim();
 			process.stderr.write(EOL + EOL + (stack || err));
 		});
@@ -113,16 +110,12 @@ function main(args) {
 	}
 
 	runner.on(`error`, (err) => {
-		errorsToReport.push(err);
+		allErrors.push(err);
+		currentBlockErrors.push(err);
 
-		totalErrorCount += 1;
-		if (totalErrorCount > maxErrors) {
-			reportErrors();
+		if (allErrors.length > maxErrors) {
+			reportErrors(allErrors);
 			process.stderr.write(`${EOL + EOL}maxErrors: ${maxErrors} exceeded. All Errors reported. Exiting.`);
-			exit(1);
-		} else if (inBeforeBlock) {
-			reportErrors();
-			process.stderr.write(`${EOL + EOL + currentBlockPath} : Error detected in before() block. All Errors reported. Exiting.`);
 			exit(1);
 		}
 	});
@@ -136,7 +129,6 @@ function main(args) {
 		switch (ev.type) {
 			case `before`:
 				beforeStartTime = Date.now();
-				inBeforeBlock = true;
 				break;
 			case `after`:
 				afterStartTime = Date.now();
@@ -145,8 +137,6 @@ function main(args) {
 	});
 
 	runner.on(`blockComplete`, (ev) => {
-		inBeforeBlock = false;
-
 		switch (ev.type) {
 			case `before`:
 				process.stderr.write(`${EOL}before() ${Date.now() - beforeStartTime}ms`);
@@ -157,19 +147,20 @@ function main(args) {
 				afterStartTime = null;
 				break;
 			default: // ev.type === "test" and all others.
+				// TODO: kixx-test needs to emit a blockComplete event, even when there is an error.
 				testCount += 1;
-				if (blockTestCount === 0) process.stderr.write(EOL);
 				process.stderr.write(`.`);
 		}
 
-		if (isBlockChange(ev)) {
-			reportErrors();
-			clearBlock();
-		}
+		clearBlock();
 	});
 
 	runner.on(`end`, () => {
-		process.stderr.write(`${EOL}Test run complete. ${testCount} tests ran. ${totalErrorCount} errors reported.${EOL}`);
+		if (allErrors.length > 0) {
+			reportErrors(allErrors);
+			process.stderr.write(EOL);
+		}
+		process.stderr.write(`${EOL}Test run complete. ${testCount} tests ran. ${allErrors.length} errors reported.${EOL}`);
 		exit(0);
 	});
 
@@ -239,8 +230,9 @@ function runCommandLineInterface() {
 
 	setupFiles.forEach((file) => {
 		const configurator = require(file.path);
+		const name = directory.relative(file.path);
 		if (isFunction(configurator)) {
-			configurator(t);
+			t.describe(name, configurator);
 		} else {
 			throw new UserError(`The setup file at ${file.path} must export a single function.`);
 		}
@@ -248,8 +240,9 @@ function runCommandLineInterface() {
 
 	files.forEach((file) => {
 		const configurator = require(file.path);
+		const name = directory.relative(file.path);
 		if (isFunction(configurator)) {
-			configurator(t);
+			t.describe(name, configurator);
 		} else {
 			throw new UserError(`The test file at ${file.path} must export a single function.`);
 		}
