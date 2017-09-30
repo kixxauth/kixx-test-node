@@ -66,6 +66,13 @@ class UserError extends Error {
 	}
 }
 
+function reportErrors(maxStack, errors) {
+	errors.forEach((err) => {
+		const stack = err.stack && err.stack.split(EOL).slice(0, maxStack).join(EOL).trim();
+		process.stderr.write(EOL + (stack || err) + EOL);
+	});
+}
+
 function main(args) {
 	const timeout = isNumber(get(`timeout`, args)) ? get(`timeout`, args) : DEFAULT_TIMEOUT;
 	const maxErrors = isNumber(get(`maxErrors`, args)) ? get(`maxErrors`, args) : DEFAULT_MAX_ERRORS;
@@ -77,33 +84,18 @@ function main(args) {
 	let testCount = 0;
 	let currentBlockPath = null;
 	let currentBlockErrors = [];
+	let currentBlockTests = 0;
 	let beforeStartTime;
 	let afterStartTime;
 
 	function setBlock(ev) {
 		currentBlockPath = ev.parents.join(` `);
 		currentBlockErrors = [];
-	}
-
-	function clearBlock() {
-		currentBlockPath = null;
-		currentBlockErrors = [];
+		currentBlockTests = 0;
 	}
 
 	function isBlockChange(ev) {
 		return ev.parents.join(` `) !== currentBlockPath;
-	}
-
-	function reportErrors(errors) {
-		errors.forEach((err) => {
-			const stack = err.stack && err.stack.split(EOL).slice(0, maxStack).join(EOL).trim();
-			process.stderr.write(EOL + EOL + (stack || err));
-		});
-	}
-
-	function exit(code) {
-		process.stderr.write(EOL);
-		process.exit(code);
 	}
 
 	runner.on(`error`, (err) => {
@@ -111,16 +103,16 @@ function main(args) {
 		currentBlockErrors.push(err);
 
 		if (allErrors.length > maxErrors) {
-			reportErrors(allErrors);
-			process.stderr.write(`${EOL + EOL}maxErrors: ${maxErrors} exceeded. All Errors reported. Exiting.`);
-			exit(1);
+			reportErrors(maxStack, allErrors);
+			process.stderr.write(`${EOL}maxErrors: ${maxErrors} exceeded. All Errors reported. Exiting.${EOL}`);
+			process.exit(1);
 		}
 	});
 
 	runner.on(`blockStart`, (ev) => {
 		if (isBlockChange(ev)) {
 			setBlock(ev);
-			process.stderr.write(EOL + currentBlockPath);
+			process.stderr.write(`${EOL}start block "${currentBlockPath}"${EOL}`);
 		}
 
 		switch (ev.type) {
@@ -136,40 +128,42 @@ function main(args) {
 	runner.on(`blockComplete`, (ev) => {
 		switch (ev.type) {
 			case `before`:
-				process.stderr.write(`${EOL}before() ${Date.now() - beforeStartTime}ms`);
+				process.stderr.write(`    before() ${Date.now() - beforeStartTime}ms${EOL}`);
 				beforeStartTime = null;
 				break;
 			case `after`:
-				process.stderr.write(`${EOL + currentBlockPath} : after() ${Date.now() - afterStartTime}ms`);
+				process.stderr.write(`    after() ${Date.now() - afterStartTime}ms${EOL}`);
 				afterStartTime = null;
 				break;
 			default: // ev.type === "test" and all others.
 				// TODO: kixx-test needs to emit a blockComplete event, even when there is an error.
+				if (currentBlockTests === 0) {
+					process.stderr.write(`${EOL}    .`);
+				} else {
+					process.stderr.write(`.`);
+				}
+				currentBlockTests += 1;
 				testCount += 1;
-				process.stderr.write(`.`);
 		}
-
-		clearBlock();
 	});
 
 	runner.on(`end`, () => {
 		if (allErrors.length > 0) {
-			reportErrors(allErrors);
+			reportErrors(maxStack, allErrors);
 			process.stderr.write(EOL);
 		}
 		process.stderr.write(`${EOL}Test run complete. ${testCount} tests ran. ${allErrors.length} errors reported.${EOL}`);
-		exit(0);
 	});
 
 	return runner;
 }
 
 function isConfigFile(file) {
-	return file.basename() === `config.js`;
+	return /config.js$/.test(file.basename());
 }
 
 function isSetupFile(file) {
-	return file.basename() === `setup.js`;
+	return /setup.js$/.test(file.basename());
 }
 
 function isTestFile(file) {
@@ -185,6 +179,8 @@ function runCommandLineInterface() {
 	const files = [];
 	const setupFiles = [];
 	const configFiles = [];
+	const setups = [];
+	const teardowns = [];
 
 	process.stderr.write(`Initializing kixx-test-node runner.${EOL}`);
 
@@ -236,12 +232,54 @@ function runCommandLineInterface() {
 	}
 
 	setupFiles.forEach((file) => {
-		const configurator = require(file.path);
-		const name = directory.relative(file.path);
-		if (isFunction(configurator)) {
-			t.describe(name, configurator);
-		} else {
-			throw new UserError(`The setup file at ${file.path} must export a single function.`);
+		const setup = require(file.path);
+
+		if (isFunction(setup.setup)) {
+			const timeout = setup.setup.timeout || options.timeout;
+
+			setups.push(new Promise((resolve, reject) => {
+				const TO = setTimeout(() => {
+					reject(new Error(`Setup timed out or did not call done() in ${file.path}`));
+				}, timeout);
+
+				try {
+					setup.setup((err) => {
+						clearTimeout(TO);
+						if (err) {
+							return reject(err);
+						}
+						resolve(true);
+					});
+				} catch (err) {
+					clearTimeout(TO);
+					reject(err);
+				}
+			}));
+		}
+
+		if (isFunction(setup.teardown)) {
+			teardowns.push(() => {
+				const timeout = setup.teardown.timeout || options.timeout;
+
+				return new Promise((resolve, reject) => {
+					const TO = setTimeout(() => {
+						reject(new Error(`Teardown timed out or did not call done() in ${file.path}`));
+					}, timeout);
+
+					try {
+						setup.teardown((err) => {
+							clearTimeout(TO);
+							if (err) {
+								return reject(err);
+							}
+							resolve(true);
+						});
+					} catch (err) {
+						clearTimeout(TO);
+						reject(err);
+					}
+				});
+			});
 		}
 	});
 
@@ -257,7 +295,33 @@ function runCommandLineInterface() {
 
 	process.stderr.write(`Test file count: ${files.length}${EOL}`);
 
-	t.run();
+	t.on(`end`, () => {
+		if (teardowns.length > 0) {
+			const promises = teardowns.map((teardown) => teardown());
+
+			return Promise.all(promises).then(() => {
+				process.stderr.write(`Test tear down complete.${EOL}`);
+				process.exit(0);
+			}).catch((err) => {
+				process.stderr.write(`Tear down failure:${EOL}`);
+				reportErrors(options.maxStack, [err]);
+				process.stderr.write(EOL);
+				process.exit(1);
+			});
+		}
+
+		process.exit(0);
+	});
+
+	return Promise.all(setups).then(() => {
+		process.stderr.write(`Setup complete.${EOL}`);
+		t.run();
+	}).catch((err) => {
+		process.stderr.write(`Setup failure:${EOL}`);
+		reportErrors(options.maxStack, [err]);
+		process.stderr.write(EOL);
+		process.exit(1);
+	});
 }
 
 exports.main = main;
