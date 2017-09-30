@@ -11,6 +11,10 @@ const DEFAULT_MAX_ERRORS = Infinity;
 const DEFAULT_MAX_STACK = 5;
 const EOL = OS.EOL;
 
+const RED = `\x1b[31m`;
+const GREEN = `\x1b[32m`;
+const COLOR_RESET = `\x1b[0m`;
+
 const ARGV = Yargs
 	.option(`directory`, {
 		alias: `d`,
@@ -73,6 +77,23 @@ function reportErrors(maxStack, errors) {
 	});
 }
 
+function getBlockId(block) {
+	return block.parents.join(` `);
+}
+
+function createBlockTracker(event) {
+	const id = getBlockId(event);
+
+	return {
+		id,
+		name: id,
+		type: event.type,
+		test: event.test,
+		beforeStartTime: null,
+		afterStartTime: null
+	};
+}
+
 function main(args) {
 	const timeout = isNumber(get(`timeout`, args)) ? get(`timeout`, args) : DEFAULT_TIMEOUT;
 	const maxErrors = isNumber(get(`maxErrors`, args)) ? get(`maxErrors`, args) : DEFAULT_MAX_ERRORS;
@@ -80,30 +101,40 @@ function main(args) {
 
 	const runner = KixxTest.createRunner({timeout});
 
-	const allErrors = [];
-	let testCount = 0;
-	let currentBlockPath = null;
-	let currentBlockErrors = [];
-	let currentBlockTests = 0;
-	let beforeStartTime;
-	let afterStartTime;
-
-	function setBlock(ev) {
-		currentBlockPath = ev.parents.join(` `);
-		currentBlockErrors = [];
-		currentBlockTests = 0;
-	}
+	const errors = [];
+	const blockTrackers = {};
+	let currentBlock = null;
+	let currentChildName = null;
 
 	function isBlockChange(ev) {
-		return ev.parents.join(` `) !== currentBlockPath;
+		return !currentBlock || currentBlock.id !== getBlockId(ev);
+	}
+
+	function setBlock(ev) {
+		const id = getBlockId(ev);
+		let block = blockTrackers[id];
+		let isNew = false;
+
+		if (!block) {
+			block = createBlockTracker(ev);
+			blockTrackers[id] = block;
+			isNew = true;
+		}
+
+		currentBlock = block;
+		return isNew;
 	}
 
 	runner.on(`error`, (err) => {
-		allErrors.push(err);
-		currentBlockErrors.push(err);
+		const stack = err.stack.split(EOL);
+		process.stderr.write(`${RED}- [${currentChildName}] FAIL${EOL}`);
+		process.stderr.write(`    ${stack[0]}${EOL}`);
+		process.stderr.write(`    ${stack[1]}${COLOR_RESET}${EOL}${EOL}`);
 
-		if (allErrors.length > maxErrors) {
-			reportErrors(maxStack, allErrors);
+		errors.push(err);
+
+		if (errors.length > maxErrors) {
+			reportErrors(maxStack, errors);
 			process.stderr.write(`${EOL}maxErrors: ${maxErrors} exceeded. All Errors reported. Exiting.${EOL}`);
 			process.exit(1);
 		}
@@ -111,48 +142,38 @@ function main(args) {
 
 	runner.on(`blockStart`, (ev) => {
 		if (isBlockChange(ev)) {
-			setBlock(ev);
-			process.stderr.write(`${EOL}start block "${currentBlockPath}"${EOL}`);
+			const isNew = setBlock(ev);
+			if (isNew) {
+				process.stderr.write(`- [${currentBlock.name}] - start${EOL}`);
+			}
 		}
 
 		switch (ev.type) {
 			case `before`:
-				beforeStartTime = Date.now();
+				currentChildName = currentBlock.name;
+				currentBlock.beforeStartTime = Date.now();
 				break;
 			case `after`:
-				afterStartTime = Date.now();
+				currentChildName = currentBlock.name;
+				currentBlock.afterStartTime = Date.now();
 				break;
+			case `test`:
+				currentChildName = `${getBlockId(ev)}: it ${ev.test}`;
 		}
 	});
 
 	runner.on(`blockComplete`, (ev) => {
+		const id = getBlockId(ev);
+		const tracker = blockTrackers[id];
+
 		switch (ev.type) {
 			case `before`:
-				process.stderr.write(`    before() ${Date.now() - beforeStartTime}ms${EOL}`);
-				beforeStartTime = null;
+				process.stderr.write(`- [${tracker.name}] - before() in ${Date.now() - tracker.beforeStartTime}ms${EOL}`);
 				break;
 			case `after`:
-				process.stderr.write(`    after() ${Date.now() - afterStartTime}ms${EOL}`);
-				afterStartTime = null;
+				process.stderr.write(`- [${tracker.name}' - after() in ${Date.now() - tracker.afterStartTime}ms${EOL}`);
 				break;
-			default: // ev.type === "test" and all others.
-				// TODO: kixx-test needs to emit a blockComplete event, even when there is an error.
-				if (currentBlockTests === 0) {
-					process.stderr.write(`${EOL}    .`);
-				} else {
-					process.stderr.write(`.`);
-				}
-				currentBlockTests += 1;
-				testCount += 1;
 		}
-	});
-
-	runner.on(`end`, () => {
-		if (allErrors.length > 0) {
-			reportErrors(maxStack, allErrors);
-			process.stderr.write(EOL);
-		}
-		process.stderr.write(`${EOL}Test run complete. ${testCount} tests ran. ${allErrors.length} errors reported.${EOL}`);
 	});
 
 	return runner;
@@ -181,6 +202,8 @@ function runCommandLineInterface() {
 	const configFiles = [];
 	const setups = [];
 	const teardowns = [];
+	const errors = [];
+	let testCount = 0;
 
 	process.stderr.write(`Initializing kixx-test-node runner.${EOL}`);
 
@@ -219,7 +242,21 @@ function runCommandLineInterface() {
 		options.maxStack = maxStack;
 	}
 
+	if (options.maxErrors < 0) {
+		options.maxErrors = Infinity;
+	}
+
 	const t = main(options);
+
+	t.on(`error`, (err) => {
+		errors.push(err);
+	});
+
+	t.on(`blockComplete`, (ev) => {
+		if (ev.type === `test`) {
+			testCount += 1;
+		}
+	});
 
 	if (explicitFiles && explicitFiles.isFile()) {
 		files.push(explicitFiles);
@@ -296,11 +333,20 @@ function runCommandLineInterface() {
 	process.stderr.write(`Test file count: ${files.length}${EOL}`);
 
 	t.on(`end`, () => {
+		if (errors.length > 0) {
+			reportErrors(options.maxStack, errors);
+			process.stderr.write(EOL);
+		}
+		process.stderr.write(`${EOL}Test run complete. ${testCount} tests ran. ${errors.length} errors reported.${EOL}`);
+
+		const passFail = errors.length === 0 ? `${GREEN}PASS${COLOR_RESET}` : `${RED}FAIL${COLOR_RESET}`;
+
 		if (teardowns.length > 0) {
 			const promises = teardowns.map((teardown) => teardown());
 
 			return Promise.all(promises).then(() => {
 				process.stderr.write(`Test tear down complete.${EOL}`);
+				process.stderr.write(`${EOL}${passFail}${EOL}`);
 				process.exit(0);
 			}).catch((err) => {
 				process.stderr.write(`Tear down failure:${EOL}`);
@@ -310,11 +356,12 @@ function runCommandLineInterface() {
 			});
 		}
 
+		process.stderr.write(`${EOL}${passFail}${EOL}`);
 		process.exit(0);
 	});
 
 	return Promise.all(setups).then(() => {
-		process.stderr.write(`Setup complete.${EOL}`);
+		process.stderr.write(`Setup complete.${EOL + EOL}`);
 		t.run();
 	}).catch((err) => {
 		process.stderr.write(`Setup failure:${EOL}`);
