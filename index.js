@@ -5,6 +5,7 @@ const Yargs = require(`yargs`);
 const Filepath = require(`filepath`);
 const KixxTest = require(`kixx-test`);
 
+const DEFAULT_DIRECTORY = `test`;
 const DEFAULT_TIMEOUT = 5000;
 const DEFAULT_MAX_ERRORS = Infinity;
 const DEFAULT_MAX_STACK = 5;
@@ -13,24 +14,20 @@ const EOL = OS.EOL;
 const ARGV = Yargs
 	.option(`directory`, {
 		alias: `d`,
-		describe: `The name of your test directory.`,
-		default: `test`,
+		describe: `The name of your test directory. (default="${DEFAULT_DIRECTORY}")`,
 		type: `string`
 	})
 	.option(`timeout`, {
 		alias: `t`,
-		describe: `The time limit for each .before(), .after(), and .it() block.`,
-		default: DEFAULT_TIMEOUT,
+		describe: `The time limit for each .before(), .after(), and .it() block. (default=${DEFAULT_TIMEOUT})`,
 		type: `number`
 	})
 	.option(`maxErrors`, {
-		describe: `The maximum errors allowed before exiting. "-1" will result in Infinity.`,
-		default: DEFAULT_MAX_ERRORS,
+		describe: `The maximum errors allowed before exiting. "-1" will result in Infinity. (default=${DEFAULT_MAX_ERRORS})`,
 		type: `number`
 	})
 	.option(`maxStack`, {
-		describe: `The maximum number of lines you want in your stack traces.`,
-		default: DEFAULT_MAX_STACK,
+		describe: `The maximum number of lines you want in your stack traces. (default=${DEFAULT_MAX_STACK})`,
 		type: `number`
 	}).argv;
 
@@ -180,7 +177,7 @@ function isTestFile(file) {
 }
 
 function runCommandLineInterface() {
-	const directory = Filepath.create(ARGV.directory);
+	const directory = Filepath.create(ARGV.directory || DEFAULT_DIRECTORY);
 	const timeout = ARGV.timeout;
 	const maxErrors = ARGV.maxErrors;
 	const maxStack = ARGV.maxStack;
@@ -206,15 +203,25 @@ function runCommandLineInterface() {
 	}
 
 	let options = {
-		timeout,
-		maxErrors,
-		maxStack
+		timeout: DEFAULT_TIMEOUT,
+		maxErrors: DEFAULT_MAX_ERRORS,
+		maxStack: DEFAULT_MAX_STACK
 	};
 
 	options = configFiles.reduce((options, file) => {
 		const extended = require(file.path);
 		return Object.assign({}, options, extended);
 	}, options);
+
+	if (isNumber(timeout)) {
+		options.timeout = timeout;
+	}
+	if (isNumber(maxErrors)) {
+		options.maxErrors = maxErrors;
+	}
+	if (isNumber(maxStack)) {
+		options.maxStack = maxStack;
+	}
 
 	const t = main(options);
 
