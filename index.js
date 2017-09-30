@@ -215,7 +215,7 @@ function runCommandLineInterface() {
 			if (isConfigFile(file)) {
 				configFiles.push(file);
 			}
-			if (isTestFile(file)) {
+			if (!explicitFiles && isTestFile(file)) {
 				files.push(file);
 			}
 		});
