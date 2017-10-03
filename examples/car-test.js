@@ -64,13 +64,13 @@ module.exports = (t) => {
 				speed = modelX.speed;
 				done();
 			});
-		});
+		}, {timeout: 8100});
 
 		t.after((done) => {
 			modelX.stop(() => {
 				done();
 			});
-		});
+		}, {timeout: 5000});
 
 		t.it(`accelerates to 60mph in less than ${timeLimit} seconds`, () => {
 			isGreaterThan(60, speed, `speed is greater than 60mph`);

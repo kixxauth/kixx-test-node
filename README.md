@@ -17,6 +17,24 @@ Or, install globally:
 $ npm install --global kixx-test-node
 ```
 
+## Command Line Reference
+You can get help directly from the command line tool by running:
+
+```
+# Installed globally
+$ kixx-test-node --help
+# Installed locally
+$ node_modules/.bin/kixx-test-node --help
+```
+
+You can run only the tests in a single file by running:
+
+```
+$ kixx-test-node ./test/path/to/my-test.js
+```
+
+__!Note:__ Running a single file like in the above example will still load any `setup.js` or `config.js` files found in the configured test directory, even if the test file is located in a different folder tree. See [Configuration and Setup Helpers](#configuration-and-setup-helpers) below.
+
 ## Authoring Tests
 In the simplest case, Kixx Test uses "it" blocks to describe conditions which should hold true. Let's say you have a file named `examples/math-round-test.js`:
 
@@ -99,7 +117,9 @@ In addition to making the test code more readable, nesting tests in describe blo
 __!Warning:__ Each describe block is a test block instance. So, although the `t` instance passed into the one block has the same API signature as another, it is a completely different instance. In practice, this fact should never bother you unless you try to assign properties to `t`.
 
 ### Asynchronous Setup and Teardown
-Example:
+Setup and teardown can be accomplished with `t.before()` and `t.after()` blocks within a describe block. Setup and teardown `t.before()` and `t.after()` blocks are *always* run asychronously. The `done()` callback passed to each of them must be called before the configured timeout expires. If `done()` is called with a truthy argument, it is assumed to be an error and will be considered to have failed.
+
+__!Important:__ It is *not* possible to test anything asychronously from within a `t.it()` block. This is by design. It forces you to put all of your asynchronous operations into `t.before()` and `t.after()` blocks and call the `done()` callback when the operation is complete. This results in cleaner tests which are easier to reason about and fewers bugs around asynchronous logic.
 
 ```js
 const KixxAssert = require(`kixx-assert`);
@@ -112,6 +132,7 @@ module.exports = (t) => {
         constructor() {
             this.speed = 0;
             this.accelerationRatePerSecond = 9; // Mile per hour gain per second.
+            this.brakingRatePerSecond = 20; /// Mile per hour loss per second.
         }
 
         accelerate(seconds, callback) {
@@ -124,12 +145,33 @@ module.exports = (t) => {
                     if (Date.now() - start < limit) {
                         goFaster(start, limit);
                     } else {
-                        callback(this);
+                        callback();
                     }
                 }, 1000);
             };
 
             goFaster(Date.now(), limit);
+        }
+
+        stop(callback) {
+            // Recursively go slower until velocity is zero.
+            const brake = (start) => {
+                setTimeout(() => {
+                    this.speed -= this.brakingRatePerSecond;
+                    if (this.speed < 0) {
+                        this.speed = 0;
+                    }
+
+                    if (this.speed === 0) {
+                        // Return the total time elapsed.
+                        callback(Date.now() - start);
+                    } else {
+                        brake(start);
+                    }
+                }, 1000);
+            };
+
+            brake(Date.now());
         }
     }
 
@@ -144,7 +186,13 @@ module.exports = (t) => {
                 speed = modelX.speed;
                 done();
             });
-        });
+        }, {timeout: 8100});
+
+        t.after((done) => {
+            modelX.stop(() => {
+                done();
+            });
+        }, {timeout: 5000});
 
         t.it(`accelerates to 60mph in less than ${timeLimit} seconds`, () => {
             isGreaterThan(60, speed, `speed is greater than 60mph`);
@@ -152,6 +200,15 @@ module.exports = (t) => {
     });
 };
 ```
+
+## Configruation and Setup Helpers
+If kixx-test-node discovers any file nested in your test directory named `config.js` it will use it to override the default configuration. You can then override these configurations using the command line arguments. See the `config.js` file in the test directory of this project as an example. Possible configuration values are:
+
+- `timeout:` The number of milliseconds available for before() and after() blocks to run before throwing a timeout error.
+- `maxErrors:` The maxiumum number of errors before bailing out of the test run. `Infinity` and `-1` both achieve the same thing. If you want the test run to bail after the first error, use `0`.
+- `maxStack:` The maximum number of lines to include in stack traces.
+
+Also, if kixx-test-node discovers any file nested in your test directory named `setup.js`, and it exports `setup` or `teardown` functions, they will be called before and after the full test run respectively. This is a great place to do things like start and shutdown HTTP and database services. See the `setup.js` file in the test directory of this project as an example.
 
 ## Test Output
 Test output is always piped into `process.std.error` by kixx-test-node. The start of each describe block, the time consumed in each before() or after() block, errors discovered in each test, the stack traces of errors, number of tests run, number of errors reported, and overall pass/fail status are reported.
