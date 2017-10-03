@@ -1,4 +1,4 @@
-// Since the base name of this file is `server.js` and not `config.js`,
+// Since the base name of this file is `server.js` and not `config.js` or
 // `setup.js`, and does not end with `test.js` it will be ignored by the
 // kixx-test-node runner. The fact that the kixx-test-node runner only loads
 // files which end with `test.js` or have the base name `config.js`
