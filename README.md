@@ -20,9 +20,10 @@ $ npm install --global kixx-test-node
 ## Command Line Reference
 You can get help directly from the command line tool by running:
 
-```
+```bash
 # Installed globally
 $ kixx-test-node --help
+
 # Installed locally
 $ node_modules/.bin/kixx-test-node --help
 ```
@@ -63,7 +64,7 @@ $ kixx-test-node examples/math-round-test.js
 ```
 
 ### How it Works
-Each concept you intend to verify with a test should be encapsulated in an `it()` block. If an error is thrown from within the block (the function passed into `t.it()`) the test will fail. If no errors are thrown the test will be considered to have passed.
+Each concept you intend to verify with a test should be encapsulated in an `t.it()` block. If an error is thrown from within the block (the function passed into `t.it()`) the test will fail. If no errors are thrown the test will be considered to have passed.
 
 The [Node.js assertion module](https://nodejs.org/dist/latest/docs/api/assert.html) works well to test expressions and throw errors, but any assertion library which throws errors on failures will work. Here are some alternatives:
 
@@ -114,12 +115,16 @@ module.exports = (t) => {
 
 In addition to making the test code more readable, nesting tests in describe blocks also makes the test output more informative in your console.
 
-__!Warning:__ Each describe block is a test block instance. So, although the `t` instance passed into the one block has the same API signature as another, it is a completely different instance. In practice, this fact should never bother you unless you try to assign properties to `t`.
+__!Warning:__ Each describe block creates a new test block instance. So, although the `t` instance passed into one block has the same API signature as another, it is a completely different instance. In practice, this fact should never bother you unless you try to assign properties to `t`.
 
 ### Asynchronous Setup and Teardown
-Setup and teardown can be accomplished with `t.before()` and `t.after()` blocks within a describe block. Setup and teardown `t.before()` and `t.after()` blocks are *always* run asychronously. The `done()` callback passed to each of them must be called before the configured timeout expires. If `done()` is called with a truthy argument, it is assumed to be an error and will be considered to have failed.
+Setup and teardown can be accomplished with `t.before()` and `t.after()` blocks within a describe block.
 
-__!Important:__ It is *not* possible to test anything asychronously from within a `t.it()` block. This is by design. It forces you to put all of your asynchronous operations into `t.before()` and `t.after()` blocks and call the `done()` callback when the operation is complete. This results in cleaner tests which are easier to reason about and fewers bugs around asynchronous logic.
+Setup and teardown `t.before()` and `t.after()` blocks are *always* run asychronously. The `done()` callback passed to each of them must be called before the configured timeout expires. If time expires a timeout error will be thrown, failing the test run.
+
+If `done()` is called with a truthy argument, it is assumed to be an error and will be considered to have failed.
+
+__!Important:__ It is *not* possible to test anything asychronously from within a `t.it()` block. This is by design. It forces you to put all of your asynchronous operations into `t.before()` and `t.after()` blocks and call the `done()` callback when the operation is complete. This results in cleaner tests which are easier to reason about, introducing fewer bugs around asynchronous logic.
 
 ```js
 const KixxAssert = require(`kixx-assert`);
@@ -201,7 +206,7 @@ module.exports = (t) => {
 };
 ```
 
-## Configruation and Setup Helpers
+## Configuration and Setup Helpers
 If kixx-test-node discovers any file nested in your test directory named `config.js` it will use it to override the default configuration. You can then override these configurations using the command line arguments. See the `config.js` file in the test directory of this project as an example. Possible configuration values are:
 
 - `timeout:` The number of milliseconds available for before() and after() blocks to run before throwing a timeout error.
@@ -260,9 +265,9 @@ FAIL
 
 The test process will exit with code 1 if a test fails or error is thrown. It will exit with code 0 if all is well.
 
-You can cause the test run to exit before completion after a certain number of errors are reported by setting `maxErrors.`.
+You can cause the test run to exit before completion after a certain number of errors are reported by setting `maxErrors` in your `config.js` file or as a command line option.
 
-You can limit the number of lines reported in error stack traces by setting `maxStack`.
+Also, you can limit the number of lines reported in error stack traces by setting `maxStack` in your `config.js` or as a command line option.
 
 Copyright and License
 ---------------------
