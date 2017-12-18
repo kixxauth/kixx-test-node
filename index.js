@@ -27,6 +27,10 @@ const ARGV = Yargs
 		describe: `The time limit for each .before(), .after(), and .it() block. (default=${DEFAULT_TIMEOUT})`,
 		type: `number`
 	})
+	.option(`pattern`, {
+		describe: `Only describe blocks and tests which match the given pattern will be run`,
+		type: `string`
+	})
 	.option(`maxErrors`, {
 		describe: `The maximum errors allowed before exiting. "-1" will result in Infinity. (default=${DEFAULT_MAX_ERRORS})`,
 		type: `number`
@@ -44,6 +48,10 @@ function get(key, obj) {
 
 function isNumber(n) {
 	return typeof n === `number` && !isNaN(n);
+}
+
+function isString(s) {
+	return typeof s === `string`;
 }
 
 function isFunction(fn) {
@@ -100,10 +108,14 @@ function createBlockTracker(event) {
 
 function main(args) {
 	const timeout = isNumber(get(`timeout`, args)) ? get(`timeout`, args) : DEFAULT_TIMEOUT;
+	const pattern = get(`pattern`, args);
 	const maxErrors = isNumber(get(`maxErrors`, args)) ? get(`maxErrors`, args) : DEFAULT_MAX_ERRORS;
 	const maxStack = isNumber(get(`maxStack`, args)) ? get(`maxStack`, args) : DEFAULT_MAX_STACK;
 
-	const runner = KixxTest.createRunner({timeout});
+	const runner = KixxTest.createRunner({
+		timeout,
+		pattern
+	});
 
 	const errors = [];
 	const blockTrackers = {};
@@ -198,6 +210,7 @@ function isTestFile(file) {
 function runCommandLineInterface() {
 	const directory = Filepath.create(ARGV.directory || DEFAULT_DIRECTORY);
 	const timeout = ARGV.timeout;
+	const pattern = ARGV.pattern;
 	const maxErrors = ARGV.maxErrors;
 	const maxStack = ARGV.maxStack;
 	const explicitFiles = ARGV._[0] ? Filepath.create(ARGV._[0]) : null;
@@ -227,6 +240,7 @@ function runCommandLineInterface() {
 
 	let options = {
 		timeout: DEFAULT_TIMEOUT,
+		pattern: null,
 		maxErrors: DEFAULT_MAX_ERRORS,
 		maxStack: DEFAULT_MAX_STACK
 	};
@@ -238,6 +252,9 @@ function runCommandLineInterface() {
 
 	if (isNumber(timeout)) {
 		options.timeout = timeout;
+	}
+	if (isString(pattern)) {
+		options.pattern = pattern;
 	}
 	if (isNumber(maxErrors)) {
 		options.maxErrors = maxErrors;
