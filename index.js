@@ -168,7 +168,7 @@ function main(args) {
 				process.stdout.write(`- [${tracker.name}] - before() in ${Date.now() - tracker.beforeStartTime}ms${EOL}`);
 				break;
 			case `after`:
-				process.stdout.write(`- [${tracker.name}' - after() in ${Date.now() - tracker.afterStartTime}ms${EOL}`);
+				process.stdout.write(`- [${tracker.name}] - after() in ${Date.now() - tracker.afterStartTime}ms${EOL}`);
 				break;
 		}
 	});
