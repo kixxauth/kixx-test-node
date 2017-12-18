@@ -73,7 +73,7 @@ class UserError extends Error {
 function reportErrors(maxStack, errors) {
 	errors.forEach((err) => {
 		const stack = err.stack && err.stack.split(EOL).slice(0, maxStack).join(EOL).trim();
-		process.stderr.write(EOL + (stack || err) + EOL);
+		process.stdout.write(EOL + (stack || err) + EOL);
 	});
 }
 
@@ -127,15 +127,15 @@ function main(args) {
 
 	runner.on(`error`, (err) => {
 		const stack = err.stack.split(EOL);
-		process.stderr.write(`${RED}- [${currentChildName}] FAIL${EOL}`);
-		process.stderr.write(`    ${stack[0]}${EOL}`);
-		process.stderr.write(`    ${stack[1]}${COLOR_RESET}${EOL}${EOL}`);
+		process.stdout.write(`${RED}- [${currentChildName}] FAIL${EOL}`);
+		process.stdout.write(`    ${stack[0]}${EOL}`);
+		process.stdout.write(`    ${stack[1]}${COLOR_RESET}${EOL}${EOL}`);
 
 		errors.push(err);
 
 		if (errors.length > maxErrors) {
 			reportErrors(maxStack, errors);
-			process.stderr.write(`${EOL}maxErrors: ${maxErrors} exceeded. All Errors reported. Exiting.${EOL}`);
+			process.stdout.write(`${EOL}maxErrors: ${maxErrors} exceeded. All Errors reported. Exiting.${EOL}`);
 			process.exit(1);
 		}
 	});
@@ -144,7 +144,7 @@ function main(args) {
 		if (isBlockChange(ev)) {
 			const isNew = setBlock(ev);
 			if (isNew) {
-				process.stderr.write(`- [${currentBlock.name}] - start${EOL}`);
+				process.stdout.write(`- [${currentBlock.name}] - start${EOL}`);
 			}
 		}
 
@@ -168,10 +168,10 @@ function main(args) {
 
 		switch (ev.type) {
 			case `before`:
-				process.stderr.write(`- [${tracker.name}] - before() in ${Date.now() - tracker.beforeStartTime}ms${EOL}`);
+				process.stdout.write(`- [${tracker.name}] - before() in ${Date.now() - tracker.beforeStartTime}ms${EOL}`);
 				break;
 			case `after`:
-				process.stderr.write(`- [${tracker.name}' - after() in ${Date.now() - tracker.afterStartTime}ms${EOL}`);
+				process.stdout.write(`- [${tracker.name}' - after() in ${Date.now() - tracker.afterStartTime}ms${EOL}`);
 				break;
 		}
 	});
@@ -205,7 +205,7 @@ function runCommandLineInterface() {
 	const errors = [];
 	let testCount = 0;
 
-	process.stderr.write(`Initializing kixx-test-node runner.${EOL}`);
+	process.stdout.write(`Initializing kixx-test-node runner.${EOL}`);
 
 	if (directory.isDirectory()) {
 		directory.recurse((file) => {
@@ -330,14 +330,14 @@ function runCommandLineInterface() {
 		}
 	});
 
-	process.stderr.write(`Test file count: ${files.length}${EOL}`);
+	process.stdout.write(`Test file count: ${files.length}${EOL}`);
 
 	t.on(`end`, () => {
 		if (errors.length > 0) {
 			reportErrors(options.maxStack, errors);
-			process.stderr.write(EOL);
+			process.stdout.write(EOL);
 		}
-		process.stderr.write(`${EOL}Test run complete. ${testCount} tests ran. ${errors.length} errors reported.${EOL}`);
+		process.stdout.write(`${EOL}Test run complete. ${testCount} tests ran. ${errors.length} errors reported.${EOL}`);
 
 		const passFail = errors.length === 0 ? `${GREEN}PASS${COLOR_RESET}` : `${RED}FAIL${COLOR_RESET}`;
 
@@ -345,28 +345,28 @@ function runCommandLineInterface() {
 			const promises = teardowns.map((teardown) => teardown());
 
 			return Promise.all(promises).then(() => {
-				process.stderr.write(`Test tear down complete.${EOL}`);
-				process.stderr.write(`${EOL}${passFail}${EOL}`);
+				process.stdout.write(`Test tear down complete.${EOL}`);
+				process.stdout.write(`${EOL}${passFail}${EOL}`);
 				process.exit(0);
 			}).catch((err) => {
-				process.stderr.write(`Tear down failure:${EOL}`);
+				process.stdout.write(`Tear down failure:${EOL}`);
 				reportErrors(options.maxStack, [err]);
-				process.stderr.write(EOL);
+				process.stdout.write(EOL);
 				process.exit(1);
 			});
 		}
 
-		process.stderr.write(`${EOL}${passFail}${EOL}`);
+		process.stdout.write(`${EOL}${passFail}${EOL}`);
 		process.exit(errors.length > 0 ? 1 : 0);
 	});
 
 	return Promise.all(setups).then(() => {
-		process.stderr.write(`Setup complete.${EOL + EOL}`);
+		process.stdout.write(`Setup complete.${EOL + EOL}`);
 		t.run();
 	}).catch((err) => {
-		process.stderr.write(`Setup failure:${EOL}`);
+		process.stdout.write(`Setup failure:${EOL}`);
 		reportErrors(options.maxStack, [err]);
-		process.stderr.write(EOL);
+		process.stdout.write(EOL);
 		process.exit(1);
 	});
 }
