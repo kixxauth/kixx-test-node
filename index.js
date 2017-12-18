@@ -357,7 +357,7 @@ function runCommandLineInterface() {
 		}
 
 		process.stderr.write(`${EOL}${passFail}${EOL}`);
-		process.exit(0);
+		process.exit(errors.length > 0 ? 1 : 0);
 	});
 
 	return Promise.all(setups).then(() => {
