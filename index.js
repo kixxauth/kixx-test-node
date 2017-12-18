@@ -13,6 +13,7 @@ const EOL = OS.EOL;
 
 const RED = `\x1b[31m`;
 const GREEN = `\x1b[32m`;
+const YELLOW = `\x1b[33m`;
 const COLOR_RESET = `\x1b[0m`;
 
 const ARGV = Yargs
@@ -130,7 +131,7 @@ function main(args) {
 
 	runner.on(`error`, (err) => {
 		const stack = err.stack.split(EOL);
-		process.stdout.write(`${RED}- [${currentChildName}] FAIL${EOL}`);
+		process.stdout.write(`${EOL}${RED}! [${currentChildName}] FAIL${EOL}`);
 		process.stdout.write(`    ${stack[0]}${EOL}`);
 		process.stdout.write(`    ${stack[1]}${COLOR_RESET}${EOL}${EOL}`);
 
@@ -172,6 +173,9 @@ function main(args) {
 				break;
 			case `after`:
 				process.stdout.write(`- [${tracker.name}] - after() in ${Date.now() - tracker.afterStartTime}ms${EOL}`);
+				break;
+			case `pendingTest`:
+				process.stdout.write(`${EOL}${YELLOW}? [${tracker.name} ${ev.test}] - pending${COLOR_RESET}${EOL + EOL}`);
 				break;
 		}
 	});
