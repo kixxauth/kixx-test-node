@@ -72,8 +72,11 @@ class UserError extends Error {
 
 function reportErrors(maxStack, errors) {
 	errors.forEach((err) => {
-		const stack = err.stack && err.stack.split(EOL).slice(0, maxStack).join(EOL).trim();
-		process.stdout.write(EOL + (stack || err) + EOL);
+		let stack = err.stack ? err.stack.split(EOL) : [];
+		if (stack.length > maxStack) {
+			stack = stack.slice(0, maxStack);
+		}
+		process.stdout.write(EOL + stack.join(EOL).trim() + EOL);
 	});
 }
 
