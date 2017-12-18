@@ -79,18 +79,61 @@ class UserError extends Error {
 	}
 }
 
+const spinner = (function () {
+	const frames = [
+		`( ●    )`,
+		`(  ●   )`,
+		`(   ●  )`,
+		`(    ● )`,
+		`(     ●)`,
+		`(    ● )`,
+		`(   ●  )`,
+		`(  ●   )`,
+		`( ●    )`,
+		`(●     )`
+	];
+
+	let interval;
+	let frameIndex = frames.length - 2;
+
+	function clear() {
+		process.stdout.clearLine();
+		process.stdout.cursorTo(0);
+	}
+
+	function render() {
+		frameIndex += 1;
+		frameIndex = frameIndex >= frames.length ? 0 : frameIndex;
+		clear();
+		process.stdout.write(frames[frameIndex]);
+	}
+
+	return {
+		start() {
+			render();
+			interval = setInterval(render, 80);
+		},
+		stop() {
+			if (interval) clearInterval(interval);
+			clear();
+		}
+	};
+}());
+
+function getBlockId(block) {
+	return block.parents.join(` `);
+}
+
 function reportErrors(maxStack, errors) {
 	errors.forEach((err) => {
 		let stack = err.stack ? err.stack.split(EOL) : [];
 		if (stack.length > maxStack) {
 			stack = stack.slice(0, maxStack);
 		}
+		const testName = err.test ? ` ${err.test}` : ``;
+		process.stdout.write(`- [${getBlockId(err)}${testName}]`);
 		process.stdout.write(EOL + stack.join(EOL).trim() + EOL);
 	});
-}
-
-function getBlockId(block) {
-	return block.parents.join(` `);
 }
 
 function createBlockTracker(event) {
@@ -117,10 +160,13 @@ function main(args) {
 		pattern
 	});
 
+	let testCount = 0;
 	const errors = [];
+	const setupBlocks = [];
+	const teardownBlocks = [];
+	const pendingBlocks = [];
 	const blockTrackers = {};
 	let currentBlock = null;
-	let currentChildName = null;
 
 	function isBlockChange(ev) {
 		return !currentBlock || currentBlock.id !== getBlockId(ev);
@@ -142,11 +188,6 @@ function main(args) {
 	}
 
 	runner.on(`error`, (err) => {
-		const stack = err.stack.split(EOL);
-		process.stdout.write(`${EOL}${RED}! [${currentChildName}] FAIL${EOL}`);
-		process.stdout.write(`    ${stack[0]}${EOL}`);
-		process.stdout.write(`    ${stack[1]}${COLOR_RESET}${EOL}${EOL}`);
-
 		errors.push(err);
 
 		if (errors.length > maxErrors) {
@@ -161,17 +202,16 @@ function main(args) {
 			setBlock(ev);
 		}
 
+		const id = getBlockId(ev);
+		const tracker = blockTrackers[id];
+
 		switch (ev.type) {
 			case `before`:
-				currentChildName = currentBlock.name;
-				currentBlock.beforeStartTime = Date.now();
+				tracker.beforeStartTime = Date.now();
 				break;
 			case `after`:
-				currentChildName = currentBlock.name;
-				currentBlock.afterStartTime = Date.now();
+				tracker.afterStartTime = Date.now();
 				break;
-			case `test`:
-				currentChildName = `${getBlockId(ev)}: it ${ev.test}`;
 		}
 	});
 
@@ -179,17 +219,54 @@ function main(args) {
 		const id = getBlockId(ev);
 		const tracker = blockTrackers[id];
 
+		if (ev.type === `test`) {
+			testCount += 1;
+		}
+
 		switch (ev.type) {
 			case `before`:
-				process.stdout.write(`- [${tracker.name}] - before() in ${Date.now() - tracker.beforeStartTime}ms${EOL}`);
+				setupBlocks.push(`- [${tracker.name}] - before() in ${Date.now() - tracker.beforeStartTime}ms${EOL}`);
 				break;
 			case `after`:
-				process.stdout.write(`- [${tracker.name}] - after() in ${Date.now() - tracker.afterStartTime}ms${EOL}`);
+				teardownBlocks.push(`- [${tracker.name}] - after() in ${Date.now() - tracker.afterStartTime}ms${EOL}`);
 				break;
 			case `pendingTest`:
-				process.stdout.write(`${EOL}${YELLOW}? [${tracker.name} ${ev.test}] - pending${COLOR_RESET}${EOL + EOL}`);
+				pendingBlocks.push(`- [${tracker.name} ${ev.test}] - pending${EOL}`);
 				break;
 		}
+	});
+
+	runner.on(`end`, () => {
+		spinner.stop();
+
+		if (setupBlocks.length > 0) {
+			process.stdout.write(`# Setup before() blocks:${EOL}`);
+			setupBlocks.forEach((msg) => {
+				process.stdout.write(msg);
+			});
+			process.stdout.write(EOL);
+		}
+		if (teardownBlocks.length > 0) {
+			process.stdout.write(`# Teardown after() blocks:${EOL}`);
+			teardownBlocks.forEach((msg) => {
+				process.stdout.write(msg);
+			});
+			process.stdout.write(EOL);
+		}
+		if (pendingBlocks.length > 0) {
+			process.stdout.write(`${YELLOW}# Pending blocks:${EOL}`);
+			pendingBlocks.forEach((msg) => {
+				process.stdout.write(msg);
+			});
+			process.stdout.write(COLOR_RESET + EOL);
+		}
+		if (errors.length > 0) {
+			process.stdout.write(`${RED}# Errors / Failures:${EOL}`);
+			reportErrors(maxStack, errors);
+			process.stdout.write(COLOR_RESET + EOL);
+		}
+
+		process.stdout.write(`${EOL}Test run complete. ${testCount} tests ran. ${errors.length} errors reported.${EOL}`);
 	});
 
 	return runner;
@@ -220,7 +297,6 @@ function runCommandLineInterface() {
 	const setups = [];
 	const teardowns = [];
 	const errors = [];
-	let testCount = 0;
 
 	process.stdout.write(`Initializing kixx-test-node runner.${EOL}`);
 
@@ -273,10 +349,26 @@ function runCommandLineInterface() {
 		errors.push(err);
 	});
 
-	t.on(`blockComplete`, (ev) => {
-		if (ev.type === `test`) {
-			testCount += 1;
+	t.on(`end`, () => {
+		const passFail = errors.length === 0 ? `${GREEN}PASS${COLOR_RESET}` : `${RED}FAIL${COLOR_RESET}`;
+
+		if (teardowns.length > 0) {
+			const promises = teardowns.map((teardown) => teardown());
+
+			return Promise.all(promises).then(() => {
+				process.stdout.write(`Test tear down complete.${EOL}`);
+				process.stdout.write(`${EOL}${passFail}${EOL}`);
+				process.exit(0);
+			}).catch((err) => {
+				process.stdout.write(`Tear down failure:${EOL}`);
+				reportErrors(maxStack, [err]);
+				process.stdout.write(EOL);
+				process.exit(1);
+			});
 		}
+
+		process.stdout.write(`${EOL}${passFail}${EOL}`);
+		process.exit(errors.length > 0 ? 1 : 0);
 	});
 
 	if (explicitFiles && explicitFiles.isFile()) {
@@ -353,38 +445,12 @@ function runCommandLineInterface() {
 
 	process.stdout.write(`Test file count: ${files.length}${EOL}`);
 
-	t.on(`end`, () => {
-		if (errors.length > 0) {
-			reportErrors(options.maxStack, errors);
-			process.stdout.write(EOL);
-		}
-		process.stdout.write(`${EOL}Test run complete. ${testCount} tests ran. ${errors.length} errors reported.${EOL}`);
-
-		const passFail = errors.length === 0 ? `${GREEN}PASS${COLOR_RESET}` : `${RED}FAIL${COLOR_RESET}`;
-
-		if (teardowns.length > 0) {
-			const promises = teardowns.map((teardown) => teardown());
-
-			return Promise.all(promises).then(() => {
-				process.stdout.write(`Test tear down complete.${EOL}`);
-				process.stdout.write(`${EOL}${passFail}${EOL}`);
-				process.exit(0);
-			}).catch((err) => {
-				process.stdout.write(`Tear down failure:${EOL}`);
-				reportErrors(options.maxStack, [err]);
-				process.stdout.write(EOL);
-				process.exit(1);
-			});
-		}
-
-		process.stdout.write(`${EOL}${passFail}${EOL}`);
-		process.exit(errors.length > 0 ? 1 : 0);
-	});
-
 	return Promise.all(setups).then(() => {
 		process.stdout.write(`Setup complete.${EOL + EOL}`);
+		spinner.start();
 		t.run();
 	}).catch((err) => {
+		spinner.stop();
 		process.stdout.write(`Setup failure:${EOL}`);
 		reportErrors(options.maxStack, [err]);
 		process.stdout.write(EOL);
