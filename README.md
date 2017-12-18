@@ -215,8 +215,26 @@ If kixx-test-node discovers any file nested in your test directory named `config
 
 Also, if kixx-test-node discovers any file nested in your test directory named `setup.js`, and it exports `setup` or `teardown` functions, they will be called before and after the full test run respectively. This is a great place to do things like start and shutdown HTTP and database services. See the `setup.js` file in the test directory of this project as an example.
 
+## Pending Tests
+Entire blocks of tests can be marked as pending by using `t.xdescribe()` where you would use `t.describe()`. None of the `before`, `after`, `describe`, or `it` blocks within the pending block will be run.
+
+Also, a single test can be marked as pending by using `xit()` where you would use `it()`.
+
+Pending blocks or tests are marked as such in the test output, but are not considered a test failure.
+
+## Exclusive Tests
+The `--pattern` command line option.
+
+It can sometimes be helpful when debugging to run a single test block or individual test exclusively. This can be done by using the `--pattern` command line option. Only nested paths which match your pattern will be run. The pattern must start with the reletive file path and should be enclosed in single `'` quotes. In the nested example above (testing JavaScript Math) let's assume the file exists on this path: `test/base-js/math-test.js`. A valid pattern would be:
+
+```
+$ node_modules/.bin/kixx-test-node --pattern 'base-js/math-test.js Math.abs() should not round floating point numbers'
+```
+
+Note that each nested block name is separated by a space in the pattern.
+
 ## Test Output
-Test output is always piped into `process.std.error` by kixx-test-node. The start of each describe block, the time consumed in each before() or after() block, errors discovered in each test, the stack traces of errors, number of tests run, number of errors reported, and overall pass/fail status are reported.
+Test output is always piped into `process.stdout` by kixx-test-node. The start of each before() or after() block, errors discovered in each test, the stack traces of errors, number of tests run, number of errors reported, and overall pass/fail status are reported.
 
 Here is an example of a successful run:
 
@@ -225,15 +243,15 @@ Initializing kixx-test-node runner.
 Test file count: 2
 Setup complete.
 
-- [../examples/math-round-test.js] - start
-- [../examples/math-test.js Math.round()] - start
-- [../examples/math-test.js Math.abs()] - start
+- [api/authors-test.js GET] - before() in 23ms
+- [api/authors-test.js POST] - before() in 6ms
+- [api/books-test.js GET] - before() in 2ms
+- [api/books-test.js POST] - before() in 4ms
 
-Test run complete. 6 tests ran. 0 errors reported.
+Test run complete. 14 tests ran. 0 errors reported.
 Test tear down complete.
 
-PASS
-```
+PASS```
 
 Here is an example of a failing run:
 
@@ -242,25 +260,23 @@ Initializing kixx-test-node runner.
 Test file count: 2
 Setup complete.
 
-- [../examples/math-round-test.js] - start
-- [../examples/math-test.js Math.round()] - start
-- [../examples/math-test.js Math.round(): it should not change integers] FAIL
-    AssertionError: -2 rounds to 2 :: expected Number(2) to equal Number(-2)
-        at t.it (/Users/kris/Projects/kixx-test-node/examples/math-test.js:22:4)
+- [api/authors-test.js GET] - before() in 21ms
+- [api/authors-test.js POST] - before() in 9ms
+- [api/books-test.js GET] - before() in 2ms
+- [api/books-test.js POST] - before() in 5ms
 
-- [../examples/math-test.js Math.abs()] - start
-
-AssertionError: -2 rounds to 2 :: expected Number(2) to equal Number(-2)
-    at t.it (/Users/kris/Projects/kixx-test-node/examples/math-test.js:22:4)
-    at test (/Users/kris/Projects/kixx-test-node/node_modules/kixx-test/kixx-test.js:127:10)
-    at link (/Users/kris/Projects/kixx-test-node/node_modules/kixx-test/kixx-test.js:25:11)
-    at test (/Users/kris/Projects/kixx-test-node/node_modules/kixx-test/kixx-test.js:136:5)
+! [api/books-test.js POST: it has HTTP 201 status code] FAIL
+    AssertionError: HTTP status code :: expected Number(201) to equal Number(200)
+        at t.it (/Users/kris/Projects/kixx-test-node/test/api/books-test.js:67:4)
 
 
-Test run complete. 6 tests ran. 1 errors reported.
-Test tear down complete.
+AssertionError: HTTP status code :: expected Number(201) to equal Number(200)
+    at t.it (/Users/kris/Projects/kixx-test-node/test/api/books-test.js:67:4)
+    at test (/Users/kris/Projects/kixx-test-node/node_modules/kixx-test/kixx-test.js:156:10)
+    at link (/Users/kris/Projects/kixx-test-node/node_modules/kixx-test/kixx-test.js:43:11)
+    at done (/Users/kris/Projects/kixx-test-node/node_modules/kixx-test/kixx-test.js:253:7)
 
-FAIL
+maxErrors: 0 exceeded. All Errors reported. Exiting.
 ```
 
 The test process will exit with code 1 if a test fails or error is thrown. It will exit with code 0 if all is well.
