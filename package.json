@@ -1,6 +1,6 @@
 {
   "name": "kixx-test-node",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A Node.js test runner and reporter with Kixx-Test under the hood.",
   "bin": {
     "kixx-test-node": "./bin/kixx-test-node"
