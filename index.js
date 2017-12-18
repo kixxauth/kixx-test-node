@@ -142,10 +142,7 @@ function main(args) {
 
 	runner.on(`blockStart`, (ev) => {
 		if (isBlockChange(ev)) {
-			const isNew = setBlock(ev);
-			if (isNew) {
-				process.stdout.write(`- [${currentBlock.name}] - start${EOL}`);
-			}
+			setBlock(ev);
 		}
 
 		switch (ev.type) {
