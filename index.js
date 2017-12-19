@@ -130,8 +130,12 @@ function reportErrors(maxStack, errors) {
 		if (stack.length > maxStack) {
 			stack = stack.slice(0, maxStack);
 		}
+
 		const testName = err.test ? ` ${err.test}` : ``;
-		process.stdout.write(`- [${getBlockId(err)}${testName}]`);
+
+		if (Array.isArray(err.parents)) {
+			process.stdout.write(`- [${getBlockId(err)}${testName}]`);
+		}
 		process.stdout.write(EOL + stack.join(EOL).trim() + EOL);
 	});
 }
@@ -360,7 +364,7 @@ function runCommandLineInterface() {
 				process.stdout.write(`${EOL}${passFail}${EOL}`);
 				process.exit(0);
 			}).catch((err) => {
-				process.stdout.write(`Tear down failure:${EOL}`);
+				process.stdout.write(`${EOL + RED}Tear down failure:${COLOR_RESET + EOL}`);
 				reportErrors(maxStack, [err]);
 				process.stdout.write(EOL);
 				process.exit(1);
@@ -451,7 +455,7 @@ function runCommandLineInterface() {
 		t.run();
 	}).catch((err) => {
 		spinner.stop();
-		process.stdout.write(`Setup failure:${EOL}`);
+		process.stdout.write(`${EOL + RED}Setup failure:${COLOR_RESET + EOL}`);
 		reportErrors(options.maxStack, [err]);
 		process.stdout.write(EOL);
 		process.exit(1);
