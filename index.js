@@ -136,7 +136,7 @@ function reportErrors(maxStack, errors) {
 		if (Array.isArray(err.parents)) {
 			process.stdout.write(`- [${getBlockId(err)}${testName}]`);
 		}
-		process.stdout.write(EOL + stack.join(EOL).trim() + EOL);
+		process.stdout.write(EOL + stack.join(EOL).trim() + EOL + EOL);
 	});
 }
 
