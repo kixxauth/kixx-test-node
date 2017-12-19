@@ -362,7 +362,7 @@ function runCommandLineInterface() {
 			return Promise.all(promises).then(() => {
 				process.stdout.write(`Test tear down complete.${EOL}`);
 				process.stdout.write(`${EOL}${passFail}${EOL}`);
-				process.exit(0);
+				process.exit(errors.length > 0 ? 1 : 0);
 			}).catch((err) => {
 				process.stdout.write(`${EOL + RED}Tear down failure:${COLOR_RESET + EOL}`);
 				reportErrors(maxStack, [err]);
