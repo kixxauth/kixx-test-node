@@ -97,8 +97,12 @@ const spinner = (function () {
 	let frameIndex = frames.length - 2;
 
 	function clear() {
-		process.stdout.clearLine();
-		process.stdout.cursorTo(0);
+		if (isFunction(process.stdout.clearLine)) {
+			process.stdout.clearLine();
+		}
+		if (isFunction(process.stdout.cursorTo)) {
+			process.stdout.cursorTo(0);
+		}
 	}
 
 	function render() {
