@@ -251,7 +251,8 @@ Setup complete.
 Test run complete. 14 tests ran. 0 errors reported.
 Test tear down complete.
 
-PASS```
+PASS
+```
 
 Here is an example of a failing run:
 
