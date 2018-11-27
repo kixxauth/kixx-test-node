@@ -35,6 +35,14 @@ const ARGV = Yargs
 		describe: `The maximum errors allowed before exiting. "-1" will result in Infinity. (default=${DEFAULT_MAX_ERRORS})`,
 		type: `number`
 	})
+	.option(`verbose`, {
+		describe: `Boolean flag to set verbose mode.`,
+		boolean: true
+	})
+	.option(`quiet`, {
+		describe: `Boolean flag to set quiet mode.`,
+		boolean: true
+	})
 	.option(`maxStack`, {
 		describe: `The maximum number of lines you want in your stack traces. (default=${DEFAULT_MAX_STACK})`,
 		type: `number`
@@ -118,8 +126,10 @@ const spinner = (function () {
 			interval = setInterval(render, 80);
 		},
 		stop() {
-			if (interval) clearInterval(interval);
-			clear();
+			if (interval) {
+				clearInterval(interval);
+				clear();
+			}
 		}
 	};
 }());
@@ -162,6 +172,8 @@ function main(args) {
 	const pattern = get(`pattern`, args);
 	const maxErrors = isNumber(get(`maxErrors`, args)) ? get(`maxErrors`, args) : DEFAULT_MAX_ERRORS;
 	const maxStack = isNumber(get(`maxStack`, args)) ? get(`maxStack`, args) : DEFAULT_MAX_STACK;
+	const verbose = Boolean(args.verbose);
+	const quiet = Boolean(args.quiet);
 
 	const runner = KixxTest.createRunner({
 		timeout,
@@ -247,21 +259,21 @@ function main(args) {
 	runner.on(`end`, () => {
 		spinner.stop();
 
-		if (setupBlocks.length > 0) {
+		if (verbose && setupBlocks.length > 0) {
 			process.stdout.write(`# Setup before() blocks:${EOL}`);
 			setupBlocks.forEach((msg) => {
 				process.stdout.write(msg);
 			});
 			process.stdout.write(EOL);
 		}
-		if (teardownBlocks.length > 0) {
+		if (verbose && teardownBlocks.length > 0) {
 			process.stdout.write(`# Teardown after() blocks:${EOL}`);
 			teardownBlocks.forEach((msg) => {
 				process.stdout.write(msg);
 			});
 			process.stdout.write(EOL);
 		}
-		if (pendingBlocks.length > 0) {
+		if (!quiet && pendingBlocks.length > 0) {
 			process.stdout.write(`${YELLOW}# Pending blocks:${EOL}`);
 			pendingBlocks.forEach((msg) => {
 				process.stdout.write(msg);
@@ -298,6 +310,8 @@ function runCommandLineInterface() {
 	const pattern = ARGV.pattern;
 	const maxErrors = ARGV.maxErrors;
 	const maxStack = ARGV.maxStack;
+	const verbose = ARGV.verbose;
+	const quiet = ARGV.quiet;
 	const explicitFiles = ARGV._[0] ? Filepath.create(ARGV._[0]) : null;
 	const files = [];
 	const setupFiles = [];
@@ -349,6 +363,18 @@ function runCommandLineInterface() {
 
 	if (options.maxErrors < 0) {
 		options.maxErrors = Infinity;
+	}
+
+	if (verbose) {
+		options.verbose = true;
+	} else {
+		options.verbose = options.verbose || false;
+	}
+
+	if (quiet) {
+		options.quiet = true;
+	} else {
+		options.quiet = options.quiet || false;
 	}
 
 	const t = main(options);
@@ -455,7 +481,9 @@ function runCommandLineInterface() {
 
 	return Promise.all(setups).then(() => {
 		process.stdout.write(`Setup complete.${EOL + EOL}`);
-		spinner.start();
+		if (!options.quiet) {
+			spinner.start();
+		}
 		t.run();
 	}).catch((err) => {
 		spinner.stop();

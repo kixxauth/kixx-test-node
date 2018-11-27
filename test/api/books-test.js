@@ -6,6 +6,16 @@ const client = require(`../helpers/client`);
 const {isOk, isEqual} = KixxAssert.assert;
 
 module.exports = function (t) {
+	function delay(ms) {
+		return function (res) {
+			return new Promise((resolve) => {
+				setTimeout(() => {
+					resolve(res);
+				}, ms);
+			});
+		};
+	}
+
 	const request = client.createClient({
 		hostname: `localhost`,
 		port: 8080
@@ -20,6 +30,7 @@ module.exports = function (t) {
 					result = res;
 					return null;
 				})
+				.then(delay(200))
 				.then(done)
 				.catch(done);
 		});
@@ -59,6 +70,7 @@ module.exports = function (t) {
 					fetch = res;
 					return null;
 				})
+				.then(delay(200))
 				.then(done)
 				.catch(done);
 		});

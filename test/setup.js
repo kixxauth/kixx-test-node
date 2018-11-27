@@ -4,10 +4,19 @@ const runServer = require(`./helpers/server`).runServer;
 
 let server = null;
 
+function delay(ms) {
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			resolve();
+		}, ms);
+	});
+}
+
 exports.setup = function setup(done) {
 	return runServer(8080).then((res) => {
 		server = res;
-		return done();
+		// Introduce a delay for testing.
+		return delay(300).then(() => done());
 	}).catch(done);
 };
 
