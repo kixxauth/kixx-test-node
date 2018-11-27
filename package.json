@@ -16,7 +16,7 @@
     "yargs": "9.0.1"
   },
   "devDependencies": {
-    "kixx-assert": "1.0.3"
+    "kixx-assert": "1.0.5"
   },
   "repository": {
     "type": "git",
