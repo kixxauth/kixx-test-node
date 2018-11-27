@@ -284,6 +284,10 @@ The test process will exit with code 1 if a test fails or error is thrown. It wi
 
 You can cause the test run to exit before completion after a certain number of errors are reported by setting `maxErrors` in your `config.js` file or as a command line option.
 
+Without the `--verbose` flag, which is the default, the before() and after() log lines will not be printed.
+
+If the `--quiet` flag is set, the spinner will not be displayed.
+
 Also, you can limit the number of lines reported in error stack traces by setting `maxStack` in your `config.js` or as a command line option.
 
 Copyright and License
