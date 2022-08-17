@@ -16,6 +16,7 @@
     "yargs": "~14.2.0"
   },
   "devDependencies": {
+    "eslint": "^8.22.0",
     "kixx-assert": "1.0.5"
   },
   "repository": {

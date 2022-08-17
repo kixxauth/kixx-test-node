@@ -1,3 +1,5 @@
+'use strict';
+
 module.exports = {
 	"parserOptions": {
 		"ecmaVersion": 6
@@ -8,106 +10,106 @@ module.exports = {
 	"globals": {
 		"Promise": true
 	},
-	"extends": "eslint:recommended",
+	"extends": `eslint:recommended`,
 	"rules": {
 		"strict": [
-			"error"
+			`error`
 		],
 		"no-const-assign": [
-			"error"
+			`error`
 		],
 		"no-var": [
-			"error"
+			`error`
 		],
 		"one-var": [
-			"error",
-			"never"
+			`error`,
+			`never`
 		],
 		"no-unused-vars": [
-			"error",
-			{"args": "none"}
+			`error`,
+			{"args": `none`}
 		],
 		"no-caller": [
-			"error"
+			`error`
 		],
 		"semi": [
-			"error",
-			"always"
+			`error`,
+			`always`
 		],
 		"curly": [
-			"error",
-			"multi-line"
+			`error`,
+			`multi-line`
 		],
 		"comma-dangle": [
-			"error",
-			"never"
+			`error`,
+			`never`
 		],
 		"eqeqeq": [
-			"error",
-			"always"
+			`error`,
+			`always`
 		],
 		"arrow-parens": [
-			"error",
-			"always"
+			`error`,
+			`always`
 		],
 		"wrap-iife": [
-			"error"
+			`error`
 		],
 		"no-shadow-restricted-names": [
-			"error"
+			`error`
 		],
 		"no-undefined": [
-			"error"
+			`error`
 		],
 		"no-labels": [
-			"error"
+			`error`
 		],
 		"for-direction": [
-			"error"
+			`error`
 		],
 		"no-extra-parens": [
-			"error"
+			`error`
 		],
 		"no-prototype-builtins": [
-			"error"
+			`error`
 		],
 		"no-template-curly-in-string": [
-			"error"
+			`error`
 		],
 		"array-callback-return": [
-			"error"
+			`error`
 		],
 		"no-floating-decimal": [
-			"error"
+			`error`
 		],
 		"radix": [
-			"error"
+			`error`
 		],
 		"no-multi-spaces": [
-			"error"
+			`error`
 		],
 		"indent": [
-			"error",
-			"tab",
+			`error`,
+			`tab`,
 			{"SwitchCase": 1}
 		],
 		"quotes": [
-			"error",
-			"backtick"
+			`error`,
+			`backtick`
 		],
 		"no-mixed-requires": [
-			"error",
+			`error`,
 			{"grouping": true, "allowCall": true}
 		],
 		"no-process-env": [
-			"error"
+			`error`
 		],
 		"no-console": [
-			"error"
+			`error`
 		],
 		"no-warning-comments": [
-			"warn",
-			{location: "anywhere"}
+			`warn`,
+			{location: `anywhere`}
 		]
 	}
 };
