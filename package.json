@@ -11,13 +11,13 @@
     "lint": "eslint ./"
   },
   "dependencies": {
-    "filepath": "1.1.0",
-    "kixx-test": "~1.4.1",
+    "filepath": "~1.1.0",
+    "kixx-test": "~1.4.0",
     "yargs": "~14.2.0"
   },
   "devDependencies": {
-    "eslint": "^8.22.0",
-    "kixx-assert": "1.0.5"
+    "eslint": "8.22.0",
+    "kixx-assert": "1.0.6"
   },
   "repository": {
     "type": "git",
