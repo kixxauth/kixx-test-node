@@ -293,15 +293,15 @@ function main(args) {
 }
 
 function isConfigFile(file) {
-	return /config.js$/.test(file.basename());
+	return /config.(js|mjs)$/.test(file.basename());
 }
 
 function isSetupFile(file) {
-	return /setup.js$/.test(file.basename());
+	return /setup.(js|mjs)$/.test(file.basename());
 }
 
 function isTestFile(file) {
-	return /test.js$/.test(file.basename());
+	return /test.(js|mjs)$/.test(file.basename());
 }
 
 function runCommandLineInterface() {
