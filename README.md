@@ -292,7 +292,7 @@ Also, you can limit the number of lines reported in error stack traces by settin
 
 Copyright and License
 ---------------------
-Copyright: (c) 2017 by Kris Walker (www.kixx.name)
+Copyright: (c) 2017 - 2023 by Kris Walker (www.kriswalker.me)
 
 Unless otherwise indicated, all source code is licensed under the MIT license. See MIT-LICENSE for details.
 
