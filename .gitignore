@@ -12,8 +12,8 @@ build/Release
 # Dependency directories
 node_modules/
 
-# Do not include package-lock
-package-lock.json
+# Do not include package-lock in source control
+/package-lock.json
 
 # Optional npm cache directory
 .npm
