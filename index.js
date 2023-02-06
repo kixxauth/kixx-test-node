@@ -1,14 +1,8 @@
 'use strict';
 
 const OS = require(`os`);
-const Yargs = require(`yargs`);
-const Filepath = require(`filepath`);
 const KixxTest = require(`kixx-test`);
 
-const DEFAULT_DIRECTORY = `test`;
-const DEFAULT_TIMEOUT = 5000;
-const DEFAULT_MAX_ERRORS = Infinity;
-const DEFAULT_MAX_STACK = 5;
 const EOL = OS.EOL;
 
 const RED = `\x1b[31m`;
@@ -16,43 +10,7 @@ const GREEN = `\x1b[32m`;
 const YELLOW = `\x1b[33m`;
 const COLOR_RESET = `\x1b[0m`;
 
-const ARGV = Yargs
-	.option(`directory`, {
-		alias: `d`,
-		describe: `The name of your test directory. (default="${DEFAULT_DIRECTORY}")`,
-		type: `string`
-	})
-	.option(`timeout`, {
-		alias: `t`,
-		describe: `The time limit for each .before(), .after(), and .it() block. (default=${DEFAULT_TIMEOUT})`,
-		type: `number`
-	})
-	.option(`pattern`, {
-		describe: `Only describe blocks and tests which match the given pattern will be run`,
-		type: `string`
-	})
-	.option(`maxErrors`, {
-		describe: `The maximum errors allowed before exiting. "-1" will result in Infinity. (default=${DEFAULT_MAX_ERRORS})`,
-		type: `number`
-	})
-	.option(`verbose`, {
-		describe: `Boolean flag to set verbose mode.`,
-		boolean: true
-	})
-	.option(`quiet`, {
-		describe: `Boolean flag to set quiet mode.`,
-		boolean: true
-	})
-	.option(`maxStack`, {
-		describe: `The maximum number of lines you want in your stack traces. (default=${DEFAULT_MAX_STACK})`,
-		type: `number`
-	}).argv;
-
 const hasOwnProperty = Object.prototype.hasOwnProperty;
-
-function get(key, obj) {
-	return hasOwnProperty.call(obj, key) ? obj[key] : null;
-}
 
 function isNumber(n) {
 	return typeof n === `number` && !isNaN(n);
@@ -87,71 +45,33 @@ class UserError extends Error {
 	}
 }
 
-const spinner = (function () {
-	const frames = [
-		`( ●    )`,
-		`(  ●   )`,
-		`(   ●  )`,
-		`(    ● )`,
-		`(     ●)`,
-		`(    ● )`,
-		`(   ●  )`,
-		`(  ●   )`,
-		`( ●    )`,
-		`(●     )`
-	];
-
-	let interval;
-	let frameIndex = frames.length - 2;
-
-	function clear() {
-		if (isFunction(process.stdout.clearLine)) {
-			process.stdout.clearLine();
-		}
-		if (isFunction(process.stdout.cursorTo)) {
-			process.stdout.cursorTo(0);
-		}
-	}
-
-	function render() {
-		frameIndex += 1;
-		frameIndex = frameIndex >= frames.length ? 0 : frameIndex;
-		clear();
-		process.stdout.write(frames[frameIndex]);
-	}
-
-	return {
-		start() {
-			render();
-			interval = setInterval(render, 80);
-		},
-		stop() {
-			if (interval) {
-				clearInterval(interval);
-				clear();
-			}
-		}
-	};
-}());
-
 function getBlockId(block) {
-	return block.parents.join(` `);
+	if (Array.isArray(block.parents)) {
+		return block.parents.join(` `);
+	}
+	return null;
 }
 
-function reportErrors(maxStack, errors) {
-	errors.forEach((err) => {
-		let stack = err.stack ? err.stack.split(EOL) : [];
-		if (stack.length > maxStack) {
-			stack = stack.slice(0, maxStack);
-		}
+function reportError(maxStack, err) {
+	let stack = err.stack ? err.stack.split(EOL) : [];
+	if (stack.length > maxStack) {
+		stack = stack.slice(0, maxStack);
+	}
 
-		const testName = err.test ? ` ${err.test}` : ``;
+	const testName = err.test ? ` ${err.test}` : ``;
+	const id = getBlockId(err);
 
-		if (Array.isArray(err.parents)) {
-			process.stdout.write(`- [${getBlockId(err)}${testName}]`);
-		}
-		process.stdout.write(EOL + stack.join(EOL).trim() + EOL + EOL);
-	});
+	let nameString = 'Unexpected Testing Error';
+	if (testName && id) {
+		nameString = `${id} ${testName}`;
+	} else if (testName) {
+		nameString = testName;
+	} else if (id) {
+		nameString = id;
+	}
+
+	process.stdout.write(`${RED}Error - [${nameString}]${COLOR_RESET}`);
+	process.stdout.write(EOL + stack.join(EOL).trim() + EOL + EOL);
 }
 
 function createBlockTracker(event) {
@@ -167,13 +87,15 @@ function createBlockTracker(event) {
 	};
 }
 
-function main(args) {
-	const timeout = isNumber(get(`timeout`, args)) ? get(`timeout`, args) : DEFAULT_TIMEOUT;
-	const pattern = get(`pattern`, args);
-	const maxErrors = isNumber(get(`maxErrors`, args)) ? get(`maxErrors`, args) : DEFAULT_MAX_ERRORS;
-	const maxStack = isNumber(get(`maxStack`, args)) ? get(`maxStack`, args) : DEFAULT_MAX_STACK;
-	const verbose = Boolean(args.verbose);
-	const quiet = Boolean(args.quiet);
+function createTestRunner(args) {
+	const {
+		timeout,
+		pattern,
+		maxErrors,
+		maxStack,
+		verbose,
+		quiet
+	} = args;
 
 	const runner = KixxTest.createRunner({
 		timeout,
@@ -208,10 +130,10 @@ function main(args) {
 	}
 
 	runner.on(`error`, (err) => {
-		errors.push(err);
+		errorCount += 1;
+		reportError(maxStack, err);
 
-		if (errors.length > maxErrors) {
-			reportErrors(maxStack, errors);
+		if (errorCount >= maxErrors) {
 			process.stdout.write(`${EOL}maxErrors: ${maxErrors} exceeded. All Errors reported. Exiting.${EOL}`);
 			process.exit(1);
 		}
@@ -257,8 +179,6 @@ function main(args) {
 	});
 
 	runner.on(`end`, () => {
-		spinner.stop();
-
 		if (verbose && setupBlocks.length > 0) {
 			process.stdout.write(`# Setup before() blocks:${EOL}`);
 			setupBlocks.forEach((msg) => {
@@ -280,47 +200,44 @@ function main(args) {
 			});
 			process.stdout.write(COLOR_RESET + EOL);
 		}
-		if (errors.length > 0) {
-			process.stdout.write(`${RED}# Errors / Failures:${EOL}`);
-			reportErrors(maxStack, errors);
-			process.stdout.write(COLOR_RESET + EOL);
-		}
 
-		process.stdout.write(`${EOL}Test run complete. ${testCount} tests ran. ${errors.length} errors reported.${EOL}`);
+		process.stdout.write(`${EOL}Test run complete. ${testCount} tests ran. ${errorCount} errors reported.${EOL}`);
 	});
 
 	return runner;
-}
-
-function isConfigFile(file) {
-	return /config.(js|mjs)$/.test(file.basename());
-}
-
-function isSetupFile(file) {
-	return /setup.(js|mjs)$/.test(file.basename());
 }
 
 function isTestFile(file) {
 	return /test.(js|mjs)$/.test(file.basename());
 }
 
-function runCommandLineInterface() {
-	const directory = Filepath.create(ARGV.directory || DEFAULT_DIRECTORY);
+exports.main = function main(ARGV, DEFAULT_VALUES) {
+	const directory = path.resolve(ARGV.directory || DEFAULT_VALUES.DEFAULT_DIRECTORY);
 	const timeout = ARGV.timeout;
 	const pattern = ARGV.pattern;
 	const maxErrors = ARGV.maxErrors;
 	const maxStack = ARGV.maxStack;
 	const verbose = ARGV.verbose;
 	const quiet = ARGV.quiet;
-	const explicitFiles = ARGV._[0] ? Filepath.create(ARGV._[0]) : null;
-	const files = [];
-	const setupFiles = [];
-	const configFiles = [];
-	const setups = [];
-	const teardowns = [];
-	const errors = [];
+	const explicitFiles = ARGV._[0] ? path.resolve(ARGV._[0]) : null;
 
-	process.stdout.write(`Initializing kixx-test-node runner.${EOL}`);
+	const source = explicitFiles ? explicitFiles : directory;
+	const files = [];
+
+	const stats = getFileStat(source);
+
+	if (!stats) {
+		throw new UserError(`The given path does not exist: ${source}`);
+	}
+
+	process.stdout.write(`Initializing kixx-test-node runner:${EOL}`);
+	process.stdout.write(`  ${source}${EOL}`);
+
+	if (stats.isFile()) {
+	} else if (stats.isDirectory()) {
+	} else {
+		throw new UserError(`The given path is not a file or directory: ${source}`);
+	}
 
 	if (directory.isDirectory()) {
 		directory.recurse((file) => {
@@ -415,58 +332,6 @@ function runCommandLineInterface() {
 		});
 	}
 
-	setupFiles.forEach((file) => {
-		const setup = require(file.path);
-
-		if (isFunction(setup.setup)) {
-			const timeout = setup.setup.timeout || options.timeout;
-
-			setups.push(new Promise((resolve, reject) => {
-				const TO = setTimeout(() => {
-					reject(new Error(`Setup timed out or did not call done() in ${file.path}`));
-				}, timeout);
-
-				try {
-					setup.setup((err) => {
-						clearTimeout(TO);
-						if (err) {
-							return reject(err);
-						}
-						resolve(true);
-					});
-				} catch (err) {
-					clearTimeout(TO);
-					reject(err);
-				}
-			}));
-		}
-
-		if (isFunction(setup.teardown)) {
-			teardowns.push(() => {
-				const timeout = setup.teardown.timeout || options.timeout;
-
-				return new Promise((resolve, reject) => {
-					const TO = setTimeout(() => {
-						reject(new Error(`Teardown timed out or did not call done() in ${file.path}`));
-					}, timeout);
-
-					try {
-						setup.teardown((err) => {
-							clearTimeout(TO);
-							if (err) {
-								return reject(err);
-							}
-							resolve(true);
-						});
-					} catch (err) {
-						clearTimeout(TO);
-						reject(err);
-					}
-				});
-			});
-		}
-	});
-
 	files.forEach((file) => {
 		const configurator = require(file.path);
 		const name = directory.relative(file.path);
@@ -493,6 +358,3 @@ function runCommandLineInterface() {
 		process.exit(1);
 	});
 }
-
-exports.main = main;
-exports.runCommandLineInterface = runCommandLineInterface;

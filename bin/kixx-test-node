@@ -2,10 +2,50 @@
 
 'use strict';
 
-const KixxTestNode = require('../');
+const Yargs = require(`yargs`);
+const { main } = require('../');
+
+const DEFAULT_VALUES = Object.freeze({
+	DEFAULT_DIRECTORY: `test`,
+	DEFAULT_TIMEOUT: 5000,
+	DEFAULT_MAX_ERRORS: Infinity,
+	DEFAULT_MAX_STACK: 5
+});
+
+const ARGV = Yargs
+	.option(`directory`, {
+		alias: `d`,
+		describe: `The name of your test directory. (default="${DEFAULT_VALUES.DEFAULT_DIRECTORY}")`,
+		type: `string`
+	})
+	.option(`timeout`, {
+		alias: `t`,
+		describe: `The time limit for each .before(), .after(), and .it() block. (default=${DEFAULT_VALUES.DEFAULT_TIMEOUT})`,
+		type: `number`
+	})
+	.option(`pattern`, {
+		describe: `Only describe blocks and tests which match the given pattern will be run`,
+		type: `string`
+	})
+	.option(`maxErrors`, {
+		describe: `The maximum errors allowed before exiting. "-1" will result in Infinity. (default=${DEFAULT_VALUES.DEFAULT_MAX_ERRORS})`,
+		type: `number`
+	})
+	.option(`verbose`, {
+		describe: `Boolean flag to set verbose mode.`,
+		boolean: true
+	})
+	.option(`quiet`, {
+		describe: `Boolean flag to set quiet mode.`,
+		boolean: true
+	})
+	.option(`maxStack`, {
+		describe: `The maximum number of lines you want in your stack traces. (default=${DEFAULT_VALUES.DEFAULT_MAX_STACK})`,
+		type: `number`
+	}).argv;
 
 try {
-	KixxTestNode.runCommandLineInterface();
+	main({ ARGV, DEFAULT_VALUES });
 } catch (err) {
 	if (err.code === `USER_ERROR`) {
 		console.error(err.message);

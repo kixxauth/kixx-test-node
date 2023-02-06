@@ -1,10 +1,8 @@
 'use strict';
 
 module.exports = {
-	"parserOptions": {
-		"ecmaVersion": 6
-	},
 	"env": {
+		"es2017": true,
 		"node": true
 	},
 	"globals": {
