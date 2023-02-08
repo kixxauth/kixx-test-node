@@ -1,6 +1,8 @@
 'use strict';
 
 const OS = require(`os`);
+const path = require(`path`);
+const fs = require(`fs`);
 const KixxTest = require(`kixx-test`);
 
 const EOL = OS.EOL;
@@ -10,39 +12,53 @@ const GREEN = `\x1b[32m`;
 const YELLOW = `\x1b[33m`;
 const COLOR_RESET = `\x1b[0m`;
 
-const hasOwnProperty = Object.prototype.hasOwnProperty;
-
 function isNumber(n) {
 	return typeof n === `number` && !isNaN(n);
-}
-
-function isString(s) {
-	return typeof s === `string`;
 }
 
 function isFunction(fn) {
 	return typeof fn === `function`;
 }
 
-class UserError extends Error {
-	constructor(message) {
-		super(message);
+function isFile(filepath) {
+	let stats;
 
-		Object.defineProperties(this, {
-			name: {
-				enumerable: true,
-				value: `UserError`
-			},
-			message: {
-				enumerable: true,
-				value: message
-			},
-			code: {
-				enumerable: true,
-				value: `USER_ERROR`
-			}
-		});
+	try {
+		stats = fs.statSync(filepath);
+	} catch (e) {
+		return false;
 	}
+
+	return stats.isFile();
+}
+
+function isDirectory(filepath) {
+	let stats;
+	
+	try {
+		stats = fs.statSync(filepath);
+	} catch (e) {
+		return false;
+	}
+
+	return stats.isDirectory();
+}
+
+function isTestFile(file) {
+	return /test.(js|mjs)$/.test(file);
+}
+
+function createBlockTracker(event) {
+	const id = getBlockId(event);
+
+	return {
+		id,
+		name: id,
+		type: event.type,
+		test: event.test,
+		beforeStartTime: null,
+		afterStartTime: null
+	};
 }
 
 function getBlockId(block) {
@@ -61,7 +77,7 @@ function reportError(maxStack, err) {
 	const testName = err.test ? ` ${err.test}` : ``;
 	const id = getBlockId(err);
 
-	let nameString = 'Unexpected Testing Error';
+	let nameString = `Unexpected Testing Error`;
 	if (testName && id) {
 		nameString = `${id} ${testName}`;
 	} else if (testName) {
@@ -74,45 +90,46 @@ function reportError(maxStack, err) {
 	process.stdout.write(EOL + stack.join(EOL).trim() + EOL + EOL);
 }
 
-function createBlockTracker(event) {
-	const id = getBlockId(event);
+function exitWithError(err) {
+	if (err && err.stack) {
+		process.stdout.write(EOL + err.stack + EOL + EOL);
+	}
 
-	return {
-		id,
-		name: id,
-		type: event.type,
-		test: event.test,
-		beforeStartTime: null,
-		afterStartTime: null
-	};
+	process.stdout.write(`Exiting${EOL}`);
+	process.exit(1);
 }
 
-function createTestRunner(args) {
-	const {
-		timeout,
-		pattern,
-		maxErrors,
-		maxStack,
-		verbose,
-		quiet
-	} = args;
+exports.main = function main(ARGV, DEFAULT_VALUES) {
+	const directory = path.resolve(ARGV.directory || DEFAULT_VALUES.DIRECTORY);
+	const timeout = isNumber(ARGV.timeout) ? ARGV.timeout : DEFAULT_VALUES.TIMEOUT;
+	const pattern = ARGV.pattern;
+	const maxErrors = isNumber(ARGV.maxErrors) ? ARGV.maxErrors : DEFAULT_VALUES.MAX_ERRORS;
+	const maxStack = isNumber(ARGV.maxStack) ? ARGV.maxStack : DEFAULT_VALUES.MAX_STACK;
+	const verbose = Boolean(ARGV.verbose);
+	const quiet = Boolean(ARGV.quiet);
+
+	let explicitFiles = null;
+
+	if (Array.isArray(ARGV._) && ARGV._.length > 0) {
+		explicitFiles = ARGV._.map((file) => {
+			return path.resolve(file);
+		});
+	}
+
+	const paths = explicitFiles ? explicitFiles : [ directory ];
+
+	const blockTrackers = {};
+	const pendingBlocks = [];
+
+	let testFileLoadCount = 0;
+	let testCount = 0;
+	let errorCount = 0;
+	let currentBlock = null;
 
 	const runner = KixxTest.createRunner({
 		timeout,
 		pattern
 	});
-
-	let testCount = 0;
-	const errors = [];
-	const setupBlocks = [];
-	const teardownBlocks = [];
-	const pendingBlocks = [];
-	const blockTrackers = {};
-	let currentBlock = null;
-
-	function isBlockChange(ev) {
-		return !currentBlock || currentBlock.id !== getBlockId(ev);
-	}
 
 	function setBlock(ev) {
 		const id = getBlockId(ev);
@@ -129,13 +146,17 @@ function createTestRunner(args) {
 		return isNew;
 	}
 
+	function isBlockChange(ev) {
+		return !currentBlock || currentBlock.id !== getBlockId(ev);
+	}
+
 	runner.on(`error`, (err) => {
 		errorCount += 1;
 		reportError(maxStack, err);
 
 		if (errorCount >= maxErrors) {
-			process.stdout.write(`${EOL}maxErrors: ${maxErrors} exceeded. All Errors reported. Exiting.${EOL}`);
-			process.exit(1);
+			process.stdout.write(`${EOL}maxErrors: ${maxErrors} exceeded. All Errors reported.${EOL}`);
+			exitWithError();
 		}
 	});
 
@@ -167,32 +188,22 @@ function createTestRunner(args) {
 
 		switch (ev.type) {
 			case `before`:
-				setupBlocks.push(`- [${tracker.name}] - before() in ${Date.now() - tracker.beforeStartTime}ms${EOL}`);
+				if (verbose) {
+					process.stdout.write(`${EOL} - [${tracker.name}] - before() in ${Date.now() - tracker.beforeStartTime}ms${EOL}`);
+				}
 				break;
 			case `after`:
-				teardownBlocks.push(`- [${tracker.name}] - after() in ${Date.now() - tracker.afterStartTime}ms${EOL}`);
+				if (verbose) {
+					process.stdout.write(`${EOL} - [${tracker.name}] - after() in ${Date.now() - tracker.afterStartTime}ms${EOL}`);
+				}
 				break;
 			case `pendingTest`:
-				pendingBlocks.push(`- [${tracker.name} ${ev.test}] - pending${EOL}`);
+				pendingBlocks.push(` - [${tracker.name} ${ev.test}] - pending${COLOR_RESET}${EOL}`);
 				break;
 		}
 	});
 
 	runner.on(`end`, () => {
-		if (verbose && setupBlocks.length > 0) {
-			process.stdout.write(`# Setup before() blocks:${EOL}`);
-			setupBlocks.forEach((msg) => {
-				process.stdout.write(msg);
-			});
-			process.stdout.write(EOL);
-		}
-		if (verbose && teardownBlocks.length > 0) {
-			process.stdout.write(`# Teardown after() blocks:${EOL}`);
-			teardownBlocks.forEach((msg) => {
-				process.stdout.write(msg);
-			});
-			process.stdout.write(EOL);
-		}
 		if (!quiet && pendingBlocks.length > 0) {
 			process.stdout.write(`${YELLOW}# Pending blocks:${EOL}`);
 			pendingBlocks.forEach((msg) => {
@@ -202,159 +213,69 @@ function createTestRunner(args) {
 		}
 
 		process.stdout.write(`${EOL}Test run complete. ${testCount} tests ran. ${errorCount} errors reported.${EOL}`);
-	});
 
-	return runner;
-}
-
-function isTestFile(file) {
-	return /test.(js|mjs)$/.test(file.basename());
-}
-
-exports.main = function main(ARGV, DEFAULT_VALUES) {
-	const directory = path.resolve(ARGV.directory || DEFAULT_VALUES.DEFAULT_DIRECTORY);
-	const timeout = ARGV.timeout;
-	const pattern = ARGV.pattern;
-	const maxErrors = ARGV.maxErrors;
-	const maxStack = ARGV.maxStack;
-	const verbose = ARGV.verbose;
-	const quiet = ARGV.quiet;
-	const explicitFiles = ARGV._[0] ? path.resolve(ARGV._[0]) : null;
-
-	const source = explicitFiles ? explicitFiles : directory;
-	const files = [];
-
-	const stats = getFileStat(source);
-
-	if (!stats) {
-		throw new UserError(`The given path does not exist: ${source}`);
-	}
-
-	process.stdout.write(`Initializing kixx-test-node runner:${EOL}`);
-	process.stdout.write(`  ${source}${EOL}`);
-
-	if (stats.isFile()) {
-	} else if (stats.isDirectory()) {
-	} else {
-		throw new UserError(`The given path is not a file or directory: ${source}`);
-	}
-
-	if (directory.isDirectory()) {
-		directory.recurse((file) => {
-			if (isSetupFile(file)) {
-				setupFiles.push(file);
-			}
-			if (isConfigFile(file)) {
-				configFiles.push(file);
-			}
-			if (!explicitFiles && isTestFile(file)) {
-				files.push(file);
-			}
-		});
-	}
-
-	let options = {
-		timeout: DEFAULT_TIMEOUT,
-		pattern: null,
-		maxErrors: DEFAULT_MAX_ERRORS,
-		maxStack: DEFAULT_MAX_STACK
-	};
-
-	options = configFiles.reduce((options, file) => {
-		const extended = require(file.path);
-		return Object.assign({}, options, extended);
-	}, options);
-
-	if (isNumber(timeout)) {
-		options.timeout = timeout;
-	}
-	if (isString(pattern)) {
-		options.pattern = pattern;
-	}
-	if (isNumber(maxErrors)) {
-		options.maxErrors = maxErrors;
-	}
-	if (isNumber(maxStack)) {
-		options.maxStack = maxStack;
-	}
-
-	if (options.maxErrors < 0) {
-		options.maxErrors = Infinity;
-	}
-
-	if (verbose) {
-		options.verbose = true;
-	} else {
-		options.verbose = options.verbose || false;
-	}
-
-	if (quiet) {
-		options.quiet = true;
-	} else {
-		options.quiet = options.quiet || false;
-	}
-
-	const t = main(options);
-
-	t.on(`error`, (err) => {
-		errors.push(err);
-	});
-
-	t.on(`end`, () => {
-		const passFail = errors.length === 0 ? `${GREEN}PASS${COLOR_RESET}` : `${RED}FAIL${COLOR_RESET}`;
-
-		if (teardowns.length > 0) {
-			const promises = teardowns.map((teardown) => teardown());
-
-			return Promise.all(promises).then(() => {
-				process.stdout.write(`Test tear down complete.${EOL}`);
-				process.stdout.write(`${EOL}${passFail}${EOL}`);
-				process.exit(errors.length > 0 ? 1 : 0);
-			}).catch((err) => {
-				process.stdout.write(`${EOL + RED}Tear down failure:${COLOR_RESET + EOL}`);
-				reportErrors(maxStack, [err]);
-				process.stdout.write(EOL);
-				process.exit(1);
-			});
-		}
-
-		process.stdout.write(`${EOL}${passFail}${EOL}`);
-		process.exit(errors.length > 0 ? 1 : 0);
-	});
-
-	if (explicitFiles && explicitFiles.isFile()) {
-		files.push(explicitFiles);
-	} else if (explicitFiles && explicitFiles.isDirectory()) {
-		explicitFiles.recurse((file) => {
-			if (isTestFile(file)) {
-				files.push(file);
-			}
-		});
-	}
-
-	files.forEach((file) => {
-		const configurator = require(file.path);
-		const name = directory.relative(file.path);
-		if (isFunction(configurator)) {
-			t.describe(name, configurator);
+		if (errorCount === 0) {
+			process.stdout.write(`${EOL}${GREEN}PASS${COLOR_RESET}${EOL}`);
+			process.exit(0);
 		} else {
-			throw new UserError(`The test file at ${file.path} must export a single function.`);
+			process.stdout.write(`${EOL}${RED}FAIL${COLOR_RESET}${EOL}`);
+			process.exit(1);
 		}
 	});
 
-	process.stdout.write(`Test file count: ${files.length}${EOL}`);
+	function loadTestFile(filepath) {
+		return import(filepath)
+			.then((describeBlock) => {
+				if (isFunction(describeBlock)) {
+					testFileLoadCount += 1;
+					runner.describe(describeBlock);
+				} else {
+					process.stdout.write(`${EOL}Test file ${filepath}${EOL}`);
+					process.stdout.write(`must export a single function as the default export${EOL}`);
+					exitWithError();
+				}
+			})
+			.catch((err) => {
+				process.stdout.write(`${EOL}Unable to load test file ${filepath}${EOL}`);
+				exitWithError(err);
+			});
+	}
 
-	return Promise.all(setups).then(() => {
-		process.stdout.write(`Setup complete.${EOL + EOL}`);
-		if (!options.quiet) {
-			spinner.start();
+	function walkFilePath(filepath) {
+		if (isFile(filepath) && isTestFile(filepath)) {
+			return loadTestFile(filepath);
 		}
-		t.run();
+		if (isDirectory(filepath)) {
+			const entries = fs.readdirSync(filepath);
+
+			return entries.reduce((promise, item) => {
+				return promise.then(() => {
+					return walkFilePath(path.join(filepath, item));
+				});
+			}, Promise.resolve(null));
+		}
+		return null;
+	}
+
+	function loadPath(promise, filepath) {
+		return promise.then(() => {
+			return walkFilePath(filepath);
+		});
+	}
+
+	paths.reduce(loadPath, Promise.resolve(null)).then(() => {
+		if (testFileLoadCount > 0) {
+			runner.run();
+		} else {
+			process.stdout.write(`${EOL}No test files found in paths:${EOL}`);
+			paths.forEach((filepath) => {
+				process.stdout.write(filepath + EOL);
+			});
+			process.stdout.write(EOL);
+			process.exit(0);
+		}
 	}).catch((err) => {
-		spinner.stop();
-		process.stdout.write(`${EOL + RED}Setup failure:${COLOR_RESET + EOL}`);
-		reportErrors(options.maxStack, [err]);
-		process.stdout.write(EOL);
-		process.exit(1);
+		process.stdout.write(`${EOL}Unexpected error while loading tests:${EOL}`);
+		exitWithError(err);
 	});
-}
+};

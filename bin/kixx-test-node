@@ -6,21 +6,21 @@ const Yargs = require(`yargs`);
 const { main } = require('../');
 
 const DEFAULT_VALUES = Object.freeze({
-	DEFAULT_DIRECTORY: `test`,
-	DEFAULT_TIMEOUT: 5000,
-	DEFAULT_MAX_ERRORS: Infinity,
-	DEFAULT_MAX_STACK: 5
+	DIRECTORY: `test`,
+	TIMEOUT: 5000,
+	MAX_ERRORS: Infinity,
+	MAX_STACK: 5
 });
 
 const ARGV = Yargs
 	.option(`directory`, {
 		alias: `d`,
-		describe: `The name of your test directory. (default="${DEFAULT_VALUES.DEFAULT_DIRECTORY}")`,
+		describe: `The name of your test directory. (default="${DEFAULT_VALUES.DIRECTORY}")`,
 		type: `string`
 	})
 	.option(`timeout`, {
 		alias: `t`,
-		describe: `The time limit for each .before(), .after(), and .it() block. (default=${DEFAULT_VALUES.DEFAULT_TIMEOUT})`,
+		describe: `The time limit for each .before(), .after(), and .it() block. (default=${DEFAULT_VALUES.TIMEOUT})`,
 		type: `number`
 	})
 	.option(`pattern`, {
@@ -28,7 +28,7 @@ const ARGV = Yargs
 		type: `string`
 	})
 	.option(`maxErrors`, {
-		describe: `The maximum errors allowed before exiting. "-1" will result in Infinity. (default=${DEFAULT_VALUES.DEFAULT_MAX_ERRORS})`,
+		describe: `The maximum errors allowed before exiting. "-1" will result in Infinity. (default=${DEFAULT_VALUES.MAX_ERRORS})`,
 		type: `number`
 	})
 	.option(`verbose`, {
@@ -40,7 +40,7 @@ const ARGV = Yargs
 		boolean: true
 	})
 	.option(`maxStack`, {
-		describe: `The maximum number of lines you want in your stack traces. (default=${DEFAULT_VALUES.DEFAULT_MAX_STACK})`,
+		describe: `The maximum number of lines you want in your stack traces. (default=${DEFAULT_VALUES.MAX_STACK})`,
 		type: `number`
 	}).argv;
 
