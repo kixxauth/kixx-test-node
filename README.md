@@ -2,6 +2,8 @@ Kixx-Test Node
 ==============
 A Node.js test runner and reporter with [Kixx-Test](https://github.com/kixxauth/kixx-test) under the hood.
 
+Created by [Kris Walker](https://www.kriswalker.me) 2017 - 2023.
+
 [![npm package](https://nodei.co/npm/kixx-test-node.png)](https://nodei.co/npm/kixx-test-node/)
 
 ## Installation
